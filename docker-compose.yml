@@ -1,0 +1,63 @@
+services:
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: trainingplatform_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: training_platform
+      POSTGRES_USER: tp_user
+      POSTGRES_PASSWORD: tp_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - trainingplatform_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tp_user -d training_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trainingplatform_app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/training_platform
+      SPRING_DATASOURCE_USERNAME: tp_user
+      SPRING_DATASOURCE_PASSWORD: tp_password
+      JWT_SECRET: dev-secret-key-minimum-32-characters-long
+      JWT_EXPIRATION: 86400000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - trainingplatform_network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: trainingplatform_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@training.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - trainingplatform_network
+
+volumes:
+  postgres_data:
+
+networks:
+  trainingplatform_network:
+    driver: bridge

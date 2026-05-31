@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: trainingplatform-backend
+  jpa:
+    open-in-view: false
