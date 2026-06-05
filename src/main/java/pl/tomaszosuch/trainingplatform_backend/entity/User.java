@@ -1,6 +1,5 @@
 package pl.tomaszosuch.trainingplatform_backend.entity;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -19,7 +18,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import jakarta.validation.constraints.Past;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -32,7 +30,7 @@ import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder    
 @Table(name = "users")
 public class User implements UserDetails {
 

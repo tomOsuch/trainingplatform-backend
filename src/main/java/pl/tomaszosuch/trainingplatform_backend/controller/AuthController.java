@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import pl.tomaszosuch.trainingplatform_backend.dto.request.LoginRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.service.AuthService;
@@ -22,5 +24,10 @@ public class AuthController {
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
         UserResponse response = authService.register(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(authService.login(request));
     }
 }

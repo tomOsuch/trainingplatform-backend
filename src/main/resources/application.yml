@@ -1,5 +1,25 @@
 spring:
   application:
     name: trainingplatform-backend
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/training_platform}
+    username: ${SPRING_DATASOURCE_USERNAME:tp_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:tp_password}
+    driver-class-name: org.postgresql.Driver
+
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+jwt:
+  secret: ${JWT_SECRET:dev-secret-key-change-me-in-production-minimum-64-bytes-long-1234}
+  expiration: ${JWT_EXPIRATION:86400000}

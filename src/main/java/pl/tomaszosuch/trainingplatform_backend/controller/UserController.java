@@ -8,19 +8,16 @@ import lombok.RequiredArgsConstructor;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.ChangePasswordRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
+import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.service.UserService;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
 
-
-// TODO: po implementacji JWT zastąpić @PathVariable Long id
-// TODO przez @AuthenticationPrincipal User currentUser
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
@@ -28,22 +25,27 @@ public class UserController {
 
     private final UserService userService;
 
-    @GetMapping("/{id}/profile")
-    public ResponseEntity<UserResponse> getProfile(@PathVariable Long id) {
-        UserResponse userResponse = userService.getUserProfile(id);
-        return ResponseEntity.ok(userResponse);
-    }
-    
-    @PutMapping("/{id}/profile")
-    public ResponseEntity<UserResponse> updateProfile(@PathVariable Long id, @Valid @RequestBody UpdateProfileRequest request) {
-        UserResponse updatedProfile = userService.updateUserProfile(id, request);
-        return ResponseEntity.ok(updatedProfile);   
+    @GetMapping
+    public ResponseEntity<UserResponse> getProfile(
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(
+            userService.getUserProfile(currentUser.getId()));
     }
 
-    @PostMapping("/{id}/change-password")
-    public ResponseEntity<String> changePassword(@PathVariable Long id, @Valid @RequestBody ChangePasswordRequest request) {
-        userService.changePassword(id, request);
-        return ResponseEntity.ok("Password changed successfully");
+    @PutMapping
+    public ResponseEntity<UserResponse> updateProfile(
+            @AuthenticationPrincipal User currentUser,
+            @Valid @RequestBody UpdateProfileRequest request) {
+        return ResponseEntity.ok(
+            userService.updateUserProfile(currentUser.getId(), request));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<Void> changePassword(
+            @AuthenticationPrincipal User currentUser,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        userService.changePassword(currentUser.getId(), request);
+        return ResponseEntity.ok().build();
     }
     
 
