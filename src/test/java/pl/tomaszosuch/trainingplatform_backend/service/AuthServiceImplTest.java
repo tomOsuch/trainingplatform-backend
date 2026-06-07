@@ -25,6 +25,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
+import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AuthServiceImpl;
 
@@ -37,6 +38,9 @@ public class AuthServiceImplTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private UserMapper userMapper;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -78,6 +82,9 @@ public class AuthServiceImplTest {
                 .thenReturn("haslo_zahashowane");
             when(userRepository.save(any(User.class)))
                 .thenReturn(savedUser);
+
+            when(userMapper.toResponse(any(User.class)))
+                .thenReturn(new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", Role.USER));  
 
             // when
             UserResponse response = authService.register(validRequest);
@@ -171,6 +178,8 @@ public class AuthServiceImplTest {
             when(userRepository.existsByEmail(anyString())).thenReturn(false);
             when(passwordEncoder.encode(anyString())).thenReturn("hash");
             when(userRepository.save(any(User.class))).thenReturn(savedUser);
+            when(userMapper.toResponse(any(User.class)))
+                .thenReturn(new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", Role.USER));  
 
             // when
             UserResponse response = authService.register(validRequest);
