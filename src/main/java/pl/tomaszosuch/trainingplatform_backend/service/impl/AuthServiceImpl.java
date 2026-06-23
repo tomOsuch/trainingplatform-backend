@@ -9,7 +9,9 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.LoginResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
+import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.JwtTokenProvider;
 import pl.tomaszosuch.trainingplatform_backend.service.AuthService;
 
 @Service
@@ -18,6 +20,8 @@ public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserMapper userMapper;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Override
     public UserResponse register(RegisterRequest request) {
@@ -35,15 +39,7 @@ public class AuthServiceImpl implements AuthService {
                 .isActive(true)
                 .build();
 
-        User savedUser = userRepository.save(user);
-
-        return new UserResponse(
-                savedUser.getId(),
-                savedUser.getEmail(),
-                savedUser.getFirstName(),
-                savedUser.getLastName(),
-                savedUser.getRole()
-        );
+        return userMapper.toResponse(userRepository.save(user));
     }
 
     @Override
@@ -60,8 +56,11 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Invalid email or password");
         }
 
+
+        String token = jwtTokenProvider.generateToken(user.getEmail());
+
         return new LoginResponse(
-                "token",
+                token,
                 user.getId(),
                 user.getEmail(),
                 user.getRole()

@@ -9,6 +9,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
+import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.UserService;
 
@@ -18,6 +19,7 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserMapper userMapper;
 
     @Override
     public UserResponse getUserProfile(Long id) {
@@ -25,13 +27,7 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
 
-        return new UserResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getFirstName(),
-                user.getLastName(),
-                user.getRole()
-        );
+        return userMapper.toResponse(user);
     }
 
     @Override
@@ -44,15 +40,8 @@ public class UserServiceImpl implements UserService {
         user.setLastName(request.lastName());
         user.setBirthDate(request.birthDate());
 
-        User updatedUser = userRepository.save(user);
 
-        return new UserResponse(
-                updatedUser.getId(),
-                updatedUser.getEmail(),
-                updatedUser.getFirstName(),
-                updatedUser.getLastName(),
-                updatedUser.getRole()
-        );
+        return userMapper.toResponse(userRepository.save(user));
     }
 
     @Override
@@ -61,17 +50,18 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
 
+        String newPassword = request.newPassword();
+
         if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
             throw new IllegalArgumentException("Podane hasło jest nieprawidłowe");
         }
 
-        if (!request.newPassword().equals(request.confirmPassword())) {
+        if (!newPassword.equals(request.confirmPassword())) {
             throw new IllegalArgumentException("Hasła nie są zgodne");
         }
 
-        if (passwordEncoder.matches(request.newPassword(), user.getPassword())) {
-            throw new IllegalArgumentException(
-                "Nowe hasło musi różnić się od aktualnego");
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Nowe hasło musi różnić się od aktualnego");
         }
 
         user.setPassword(passwordEncoder.encode(request.newPassword()));
