@@ -3,17 +3,21 @@ package pl.tomaszosuch.trainingplatform_backend.service.impl;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.WorkoutLogRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.WorkoutLogResponse;
+import pl.tomaszosuch.trainingplatform_backend.entity.TrainingPlan;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutLog;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
+import pl.tomaszosuch.trainingplatform_backend.exception.TrainingPlanNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.exception.WorkoutCategoryNotFoundException;
+import pl.tomaszosuch.trainingplatform_backend.exception.WorkoutLogNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.WorkoutLogMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
@@ -48,7 +52,12 @@ public class WorkoutLogServiceImpl implements WorkoutLogService {
     @Override
     @Transactional(readOnly = true)
     public WorkoutLogResponse getById(Long userId, Long logId) {
-        return workoutLogMapper.toResponse(workoutLogRepository.findById(logId).orElseThrow());
+        WorkoutLog log = workoutLogRepository.findById(logId)
+            .orElseThrow(() -> new WorkoutLogNotFoundException(logId));
+        if (!log.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("You do not have access to this workout log.");
+        }
+        return workoutLogMapper.toResponse(log);
     }
 
     @Override
@@ -59,10 +68,19 @@ public class WorkoutLogServiceImpl implements WorkoutLogService {
         WorkoutCategory category = categoryRepository.findById(request.categoryId())
             .orElseThrow(() -> new WorkoutCategoryNotFoundException(request.categoryId()));
 
+        TrainingPlan plan = null;
+        if (request.planId() != null) {
+            plan = trainingPlanRepository.findById(request.planId())
+                .orElseThrow(() -> new TrainingPlanNotFoundException(request.planId()));
+            if (!plan.getUser().getId().equals(userId)) {
+                throw new AccessDeniedException("You do not have access to this training plan.");
+            }
+        }
+
         WorkoutLog log = WorkoutLog.builder()
             .user(user)
             .category(category)
-            .plan(trainingPlanRepository.findById(request.planId()).orElse(null))
+            .plan(plan)
             .performedDate(request.performedDate())
             .durationMin(request.durationMin())
             .intensity(request.intensity())
