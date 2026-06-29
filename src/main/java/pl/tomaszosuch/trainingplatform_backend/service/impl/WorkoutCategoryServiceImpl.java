@@ -11,7 +11,9 @@ import pl.tomaszosuch.trainingplatform_backend.dto.response.WorkoutCategoryRespo
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
 import pl.tomaszosuch.trainingplatform_backend.exception.WorkoutCategoryNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.WorkoutCategoryMapper;
+import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutCategoryRepository;
+import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutLogRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.WorkoutCategoryService;
 
 @Service
@@ -20,6 +22,8 @@ public class WorkoutCategoryServiceImpl implements WorkoutCategoryService {
     
     private final WorkoutCategoryRepository workoutCategoryRepository;
     private final WorkoutCategoryMapper workoutCategoryMapper;
+    private final TrainingPlanRepository trainingPlanRepository;
+    private final WorkoutLogRepository workoutLogRepository;
     
     @Override
     @Transactional(readOnly = true)  
@@ -81,10 +85,14 @@ public class WorkoutCategoryServiceImpl implements WorkoutCategoryService {
 
     @Override
     public void deleteCategory(Long id) {
-        if (!workoutCategoryRepository.existsById(id)) {
-            throw new WorkoutCategoryNotFoundException("Workout category with id " + id + " not found.");
+        WorkoutCategory category = workoutCategoryRepository.findById(id).orElseThrow(() -> new WorkoutCategoryNotFoundException("Workout category with id " + id + " not found."));
+
+        if (trainingPlanRepository.existsByCategoryId(id) || workoutLogRepository.existsByCategoryId(id)) {
+            throw new IllegalArgumentException(
+                "Nie można usunąć kategorii, która jest używana przez treningi");
         }
-        workoutCategoryRepository.deleteById(id);
+
+        workoutCategoryRepository.delete(category);
     }
 
 }
