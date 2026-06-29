@@ -25,7 +25,9 @@ import pl.tomaszosuch.trainingplatform_backend.dto.response.WorkoutCategoryRespo
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
 import pl.tomaszosuch.trainingplatform_backend.exception.WorkoutCategoryNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.WorkoutCategoryMapper;
+import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutCategoryRepository;
+import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutLogRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.WorkoutCategoryServiceImpl;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,6 +42,12 @@ public class WorkoutCategoryServiceImplTest {
 
     @Mock
     private WorkoutCategoryMapper workoutCategoryMapper;
+
+    @Mock
+    private TrainingPlanRepository trainingPlanRepository;
+
+    @Mock
+    private WorkoutLogRepository workoutLogRepository;
 
     private WorkoutCategory category;
     private WorkoutCategoryResponse categoryResponse;
@@ -189,12 +197,12 @@ public class WorkoutCategoryServiceImplTest {
         WorkoutCategoryRequest request = new WorkoutCategoryRequest(
                 "Joga", "#3498DB", "yoga");
 
-            when(workoutCategoryRepository.findById(99L)).thenReturn(Optional.empty());
+        when(workoutCategoryRepository.findById(99L)).thenReturn(Optional.empty());
 
-            assertThrows(WorkoutCategoryNotFoundException.class,
+        assertThrows(WorkoutCategoryNotFoundException.class,
                 () -> workoutCategoryService.updateCategory(99L, request));
 
-            verify(workoutCategoryRepository, never()).save(any());
+        verify(workoutCategoryRepository, never()).save(any());
     }
 
     @Test
@@ -215,24 +223,62 @@ public class WorkoutCategoryServiceImplTest {
     }
 
     @Test
-    @DisplayName("powinien usunąć kategorię gdy istnieje")
-    public void shouldDeleteCategoryWhenExists() {
-        when(workoutCategoryRepository.existsById(1L)).thenReturn(true);
-
-            workoutCategoryService.deleteCategory(1L);
-
-            verify(workoutCategoryRepository).deleteById(1L);
-    }
-
-    @Test
     @DisplayName("powinien rzucić wyjątek gdy kategoria nie istnieje")
     public void shouldThrowExceptionWhenCategoryDoesNotExistToDelete() {
-        when(workoutCategoryRepository.existsById(99L)).thenReturn(false);
+        when(workoutCategoryRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(WorkoutCategoryNotFoundException.class,
                 () -> workoutCategoryService.deleteCategory(99L));
 
-        verify(workoutCategoryRepository, never()).deleteById(99L);
+        verify(workoutCategoryRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("powinien usunąć kategorię gdy nie jest używana")
+    void shouldDeleteCategoryWhenNotInUse() {
+        // given
+        when(workoutCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
+        when(trainingPlanRepository.existsByCategoryId(1L)).thenReturn(false);
+        when(workoutLogRepository.existsByCategoryId(1L)).thenReturn(false);
+
+        // when
+        workoutCategoryService.deleteCategory(1L);
+
+        // then
+        verify(workoutCategoryRepository).delete(category);
+    }
+
+    @Test
+    @DisplayName("powinien rzucić wyjątek gdy kategoria jest używana przez plan treningowy")
+    void shouldThrowExceptionWhenUsedByTrainingPlan() {
+        // given
+        when(workoutCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
+        when(trainingPlanRepository.existsByCategoryId(1L)).thenReturn(true);
+
+        // when & then
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> workoutCategoryService.deleteCategory(1L));
+
+        assertTrue(ex.getMessage().contains("używana"));
+        verify(workoutCategoryRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("powinien rzucić wyjątek gdy kategoria jest używana przez wpis dziennika")
+    void shouldThrowExceptionWhenUsedByWorkoutLog() {
+        // given
+        when(workoutCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
+        when(trainingPlanRepository.existsByCategoryId(1L)).thenReturn(false);
+        when(workoutLogRepository.existsByCategoryId(1L)).thenReturn(true);
+
+        // when & then
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> workoutCategoryService.deleteCategory(1L));
+
+        assertTrue(ex.getMessage().contains("używana"));
+        verify(workoutCategoryRepository, never()).delete(any());
     }
 
 }
