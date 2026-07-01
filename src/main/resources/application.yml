@@ -23,3 +23,13 @@ server:
 jwt:
   secret: ${JWT_SECRET:dev-secret-key-change-me-in-production-minimum-64-bytes-long-1234}
   expiration: ${JWT_EXPIRATION:86400000}
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
