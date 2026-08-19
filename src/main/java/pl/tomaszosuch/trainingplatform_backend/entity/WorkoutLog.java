@@ -2,6 +2,7 @@ package pl.tomaszosuch.trainingplatform_backend.entity;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,9 +45,12 @@ public class WorkoutLog {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)
     private WorkoutCategory category;
-    
+
     @Column(name = "performed_date", nullable = false)
     private LocalDate performedDate;
+
+    @Column(name = "performed_time")
+    private LocalTime performedTime;
 
     @Column(name = "duration_min")
     private Integer durationMin;

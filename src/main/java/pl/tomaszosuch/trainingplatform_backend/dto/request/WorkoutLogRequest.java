@@ -1,6 +1,7 @@
 package pl.tomaszosuch.trainingplatform_backend.dto.request;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -15,6 +16,8 @@ public record WorkoutLogRequest(
         Long planId,
 
         @NotNull(message = "Data treningu jest wymagana") @PastOrPresent(message = "Data treningu nie może być z przyszłości") LocalDate performedDate,
+
+        LocalTime performedTime,
 
         @Positive(message = "Czas trwania musi być większy od 0") Integer durationMin,
 
