@@ -71,10 +71,10 @@ public class WorkoutLogControllerTest {
 
         logResponse = new WorkoutLogResponse(
                 10L, 5L, "Taniec", "#9B59B6", null,
-                LocalDate.now(), 60, 7, "dobry trening");
+                LocalDate.now(), null, 60, 7, "dobry trening");
 
         validRequest = new WorkoutLogRequest(
-                5L, null, LocalDate.now(), 60, 7, "dobry trening");
+                5L, null, LocalDate.now(), null, 60, 7, "dobry trening");
     }
 
     @Test
@@ -195,7 +195,7 @@ public class WorkoutLogControllerTest {
     public void shouldReturn400WhenCategoryIsNull() throws Exception {
 
         WorkoutLogRequest invalid = new WorkoutLogRequest(
-                null, null, LocalDate.now(), 60, 7, null);
+                null, null, LocalDate.now(), null, 60, 7, null);
 
         mockMvc.perform(post("/workout-logs")
                 .with(user(currentUser))
@@ -212,7 +212,7 @@ public class WorkoutLogControllerTest {
     @DisplayName("powinien zwrócić 400 gdy data jest z przyszłości")
     public void shouldReturn400WhenDateInFuture() throws Exception {
         WorkoutLogRequest invalid = new WorkoutLogRequest(
-                5L, null, LocalDate.now().plusDays(1), 60, 7, null);
+                5L, null, LocalDate.now().plusDays(1), null, 60, 7, null);
 
         mockMvc.perform(post("/workout-logs")
                 .with(user(currentUser))
@@ -229,7 +229,7 @@ public class WorkoutLogControllerTest {
     @DisplayName("powinien zwrócić 400 gdy czas trwania wynosi 0")
     public void shouldReturn400WhenDurationIsZero() throws Exception {
         WorkoutLogRequest invalid = new WorkoutLogRequest(
-                5L, null, LocalDate.now(), 0, 7, null);
+                5L, null, LocalDate.now(), null, 0, 7, null);
 
         mockMvc.perform(post("/workout-logs")
                 .with(user(currentUser))
