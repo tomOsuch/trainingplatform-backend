@@ -27,9 +27,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
-
 @RestController
-@RequestMapping("/trainingPlan")
+@RequestMapping("/training-plans")
 @RequiredArgsConstructor
 public class TrainingPlanController {
 
@@ -38,25 +37,24 @@ public class TrainingPlanController {
     @GetMapping
     public ResponseEntity<List<TrainingPlanResponse>> getUserPlans(
             @AuthenticationPrincipal User currentUser,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ResponseEntity.ok(
-            trainingPlanService.getTrainingPlansByUserId(currentUser.getId(), from, to));
+                trainingPlanService.getTrainingPlansByUserId(currentUser.getId(), from, to));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TrainingPlanResponse> getById(@AuthenticationPrincipal User currentUser, @PathVariable Long id) {
-        return ResponseEntity.ok(trainingPlanService.getTrainingPlanById(id, currentUser.getId())); 
+    public ResponseEntity<TrainingPlanResponse> getById(@AuthenticationPrincipal User currentUser,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(trainingPlanService.getTrainingPlanById(id, currentUser.getId()));
     }
-    
+
     @PostMapping
     public ResponseEntity<TrainingPlanResponse> create(
             @AuthenticationPrincipal User currentUser,
             @Valid @RequestBody TrainingPlanRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(trainingPlanService.createTrainingPlan(currentUser.getId(), request));
+                .body(trainingPlanService.createTrainingPlan(currentUser.getId(), request));
     }
 
     @PutMapping("/{id}")
@@ -65,7 +63,7 @@ public class TrainingPlanController {
             @PathVariable Long id,
             @Valid @RequestBody TrainingPlanRequest request) {
         return ResponseEntity.ok(
-            trainingPlanService.updateTrainingPlan(currentUser.getId(), id, request));
+                trainingPlanService.updateTrainingPlan(currentUser.getId(), id, request));
     }
 
     @PatchMapping("/{id}/status")
@@ -74,7 +72,7 @@ public class TrainingPlanController {
             @PathVariable Long id,
             @Valid @RequestBody StatusUpdateRequest request) {
         return ResponseEntity.ok(
-            trainingPlanService.changeStatus(currentUser.getId(), id, request));
+                trainingPlanService.changeStatus(currentUser.getId(), id, request));
     }
 
     @DeleteMapping("/{id}")
