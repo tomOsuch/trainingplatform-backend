@@ -27,6 +27,7 @@ import pl.tomaszosuch.trainingplatform_backend.service.WorkoutLogService;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class WorkoutLogServiceImpl implements WorkoutLogService {
 
     private final WorkoutLogRepository workoutLogRepository;
@@ -52,30 +53,19 @@ public class WorkoutLogServiceImpl implements WorkoutLogService {
     @Override
     @Transactional(readOnly = true)
     public WorkoutLogResponse getById(Long userId, Long logId) {
-        WorkoutLog log = workoutLogRepository.findById(logId)
-            .orElseThrow(() -> new WorkoutLogNotFoundException(logId));
-        if (!log.getUser().getId().equals(userId)) {
-            throw new AccessDeniedException("You do not have access to this workout log.");
-        }
+        WorkoutLog log = findOwnedLog(logId, userId);
         return workoutLogMapper.toResponse(log);
     }
 
     @Override
     public WorkoutLogResponse create(Long userId, WorkoutLogRequest request) {
-         User user = userRepository.findById(userId)
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new UserNotFoundException(userId));
 
         WorkoutCategory category = categoryRepository.findById(request.categoryId())
             .orElseThrow(() -> new WorkoutCategoryNotFoundException(request.categoryId()));
 
-        TrainingPlan plan = null;
-        if (request.planId() != null) {
-            plan = trainingPlanRepository.findById(request.planId())
-                .orElseThrow(() -> new TrainingPlanNotFoundException(request.planId()));
-            if (!plan.getUser().getId().equals(userId)) {
-                throw new AccessDeniedException("You do not have access to this training plan.");
-            }
-        }
+        TrainingPlan plan = resolvePlan(request.planId(), userId);
 
         WorkoutLog log = WorkoutLog.builder()
             .user(user)
@@ -92,13 +82,13 @@ public class WorkoutLogServiceImpl implements WorkoutLogService {
 
     @Override
     public WorkoutLogResponse update(Long userId, Long logId, WorkoutLogRequest request) {
-         WorkoutLog log = workoutLogRepository.findById(logId).orElseThrow(() -> new RuntimeException("Log not found"));
+        WorkoutLog log = findOwnedLog(logId, userId);
 
         WorkoutCategory category = categoryRepository.findById(request.categoryId())
             .orElseThrow(() -> new WorkoutCategoryNotFoundException(request.categoryId()));
 
         log.setCategory(category);
-        log.setPlan(trainingPlanRepository.findById(request.planId()).orElse(null));
+        log.setPlan(resolvePlan(request.planId(), userId));
         log.setPerformedDate(request.performedDate());
         log.setDurationMin(request.durationMin());
         log.setIntensity(request.intensity());
@@ -109,8 +99,34 @@ public class WorkoutLogServiceImpl implements WorkoutLogService {
 
     @Override
     public void delete(Long userId, Long logId) {
-         WorkoutLog log = workoutLogRepository.findById(logId).orElseThrow(() -> new RuntimeException("Log not found"));
+        WorkoutLog log = findOwnedLog(logId, userId);
         workoutLogRepository.delete(log);
+    }
+
+    private WorkoutLog findOwnedLog(Long logId, Long userId) {
+        WorkoutLog log = workoutLogRepository.findById(logId)
+            .orElseThrow(() -> new WorkoutLogNotFoundException(logId));
+
+        if (!log.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("Brak uprawnień do tego wpisu w dzienniku");
+        }
+
+        return log;
+    }
+
+    private TrainingPlan resolvePlan(Long planId, Long userId) {
+        if (planId == null) {
+            return null;
+        }
+
+        TrainingPlan plan = trainingPlanRepository.findById(planId)
+            .orElseThrow(() -> new TrainingPlanNotFoundException(planId));
+
+        if (!plan.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("Brak uprawnień do tego planu treningowego");
+        }
+
+        return plan;
     }
 
 }
