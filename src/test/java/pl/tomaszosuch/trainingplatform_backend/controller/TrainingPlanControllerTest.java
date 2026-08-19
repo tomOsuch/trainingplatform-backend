@@ -88,7 +88,7 @@ public class TrainingPlanControllerTest {
         when(trainingPlanService.getTrainingPlansByUserId(1L, null, null)).thenReturn(List.of(planResponse));
 
         // when
-        mockMvc.perform(get("/trainingPlan").with(user(currentUser)))
+        mockMvc.perform(get("/training-plans").with(user(currentUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(10))
                 .andExpect(jsonPath("$[0].title").value("Salsa wieczorna"))
@@ -107,7 +107,7 @@ public class TrainingPlanControllerTest {
         when(trainingPlanService.getTrainingPlanById(10L, 1L)).thenReturn(planResponse);
 
         // when
-        mockMvc.perform(get("/trainingPlan/10").with(user(currentUser)))
+        mockMvc.perform(get("/training-plans/10").with(user(currentUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(10))
                 .andExpect(jsonPath("$.title").value("Salsa wieczorna"))
@@ -126,7 +126,7 @@ public class TrainingPlanControllerTest {
                 .thenThrow(new TrainingPlanNotFoundException(99L));
 
         // when
-        mockMvc.perform(get("/trainingPlan/99").with(user(currentUser)))
+        mockMvc.perform(get("/training-plans/99").with(user(currentUser)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
     }
@@ -137,7 +137,7 @@ public class TrainingPlanControllerTest {
         when(trainingPlanService.getTrainingPlanById(10L, 1L))
                 .thenThrow(new AccessDeniedException("Brak uprawnień"));
 
-        mockMvc.perform(get("/trainingPlan/10")
+        mockMvc.perform(get("/training-plans/10")
                 .with(user(currentUser)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403));
@@ -149,7 +149,7 @@ public class TrainingPlanControllerTest {
         when(trainingPlanService.createTrainingPlan(eq(1L), any(TrainingPlanRequest.class)))
                 .thenReturn(planResponse);
 
-        mockMvc.perform(post("/trainingPlan")
+        mockMvc.perform(post("/training-plans")
                 .with(user(currentUser))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
