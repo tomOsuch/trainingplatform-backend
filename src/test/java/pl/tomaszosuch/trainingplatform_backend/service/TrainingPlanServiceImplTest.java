@@ -35,6 +35,7 @@ import pl.tomaszosuch.trainingplatform_backend.mapper.TrainingPlanMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutCategoryRepository;
+import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutLogRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.TrainingPlanServiceImpl;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,6 +50,9 @@ public class TrainingPlanServiceImplTest {
 
     @Mock
     private WorkoutCategoryRepository categoryRepository;
+
+    @Mock
+    private WorkoutLogRepository workoutLogRepository;
 
     @Mock
     private TrainingPlanMapper planMapper;
@@ -237,7 +241,63 @@ public class TrainingPlanServiceImplTest {
 
         planService.deleteTrainingPlan(OWNER_ID, PLAN_ID);
 
+        verify(workoutLogRepository).detachLogsFromPlan(PLAN_ID);
         verify(planRepository).delete(plan);
+    }
+
+    @Test
+    @DisplayName("powinien rzucić IllegalArgumentException gdy tworzony plan ma datę z przeszłości")
+    void shouldThrowWhenCreatingPlanWithPastDate() {
+        TrainingPlanRequest request = new TrainingPlanRequest(
+                "Salsa", CATEGORY_ID, LocalDate.now().minusDays(1), null, 60, null);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> planService.createTrainingPlan(OWNER_ID, request));
+
+        verify(planRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("powinien pozwolić na edycję starego planu gdy data pozostaje bez zmian")
+    void shouldAllowUpdatingOldPlanWhenDateUnchanged() {
+        LocalDate pastDate = LocalDate.now().minusDays(10);
+
+        TrainingPlan oldPlan = TrainingPlan.builder()
+                .id(PLAN_ID)
+                .user(owner)
+                .category(category)
+                .title("Salsa archiwalna")
+                .plannedDate(pastDate)
+                .durationMin(60)
+                .status(PlanStatus.COMPLETED)
+                .build();
+
+        TrainingPlanRequest request = new TrainingPlanRequest(
+                "Salsa archiwalna - poprawiona", CATEGORY_ID, pastDate, null, 75, "notatki po fakcie");
+
+        when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(oldPlan));
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
+        when(planRepository.save(any(TrainingPlan.class))).thenReturn(oldPlan);
+        when(planMapper.toResponse(any(TrainingPlan.class))).thenReturn(planResponse);
+
+        planService.updateTrainingPlan(OWNER_ID, PLAN_ID, request);
+
+        verify(planRepository).save(argThat(p -> p.getDurationMin() == 75 &&
+                p.getPlannedDate().equals(pastDate)));
+    }
+
+    @Test
+    @DisplayName("powinien rzucić IllegalArgumentException gdy data planu jest przestawiana w przeszłość")
+    void shouldThrowWhenMovingPlanDateToPast() {
+        TrainingPlanRequest request = new TrainingPlanRequest(
+                "Salsa", CATEGORY_ID, LocalDate.now().minusDays(2), null, 60, null);
+
+        when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> planService.updateTrainingPlan(OWNER_ID, PLAN_ID, request));
+
+        verify(planRepository, never()).save(any());
     }
 
 }

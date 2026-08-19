@@ -351,4 +351,53 @@ public class WorkoutLogServiceImplTest {
         verify(workoutLogRepository).delete(log);
     }
 
+    @Test
+    @DisplayName("powinien rzucić 403 gdy edytowany wpis należy do innego użytkownika")
+    void shouldThrowAccessDeniedWhenUpdatingNotOwnedLog() {
+        WorkoutLogRequest request = new WorkoutLogRequest(
+                CATEGORY_ID, null, LocalDate.now(), 90, 9, "próba edycji cudzego wpisu");
+
+        when(workoutLogRepository.findById(LOG_ID)).thenReturn(Optional.of(log));
+
+        assertThrows(AccessDeniedException.class,
+                () -> workoutLogService.update(OTHER_USER_ID, LOG_ID, request));
+
+        verify(workoutLogRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("powinien rzucić 403 gdy usuwany wpis należy do innego użytkownika")
+    void shouldThrowAccessDeniedWhenDeletingNotOwnedLog() {
+        when(workoutLogRepository.findById(LOG_ID)).thenReturn(Optional.of(log));
+
+        assertThrows(AccessDeniedException.class,
+                () -> workoutLogService.delete(OTHER_USER_ID, LOG_ID));
+
+        verify(workoutLogRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("powinien rzucić 404 gdy edytowany wpis nie istnieje")
+    void shouldThrowNotFoundWhenUpdatingNonExistingLog() {
+        WorkoutLogRequest request = new WorkoutLogRequest(
+                CATEGORY_ID, null, LocalDate.now(), 60, 5, null);
+
+        when(workoutLogRepository.findById(LOG_ID)).thenReturn(Optional.empty());
+
+        assertThrows(WorkoutLogNotFoundException.class,
+                () -> workoutLogService.update(OWNER_ID, LOG_ID, request));
+
+        verify(workoutLogRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("powinien rzucić 404 gdy usuwany wpis nie istnieje")
+    void shouldThrowNotFoundWhenDeletingNonExistingLog() {
+        when(workoutLogRepository.findById(LOG_ID)).thenReturn(Optional.empty());
+
+        assertThrows(WorkoutLogNotFoundException.class,
+                () -> workoutLogService.delete(OWNER_ID, LOG_ID));
+
+        verify(workoutLogRepository, never()).delete(any());
+    }
 }
