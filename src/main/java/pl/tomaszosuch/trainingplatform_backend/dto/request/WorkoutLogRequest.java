@@ -8,8 +8,11 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 public record WorkoutLogRequest(
+
+        @Size(max = 255, message = "Tytuł może mieć maksymalnie 255 znaków") String title,
 
         @NotNull(message = "Kategoria jest wymagana") Long categoryId,
 

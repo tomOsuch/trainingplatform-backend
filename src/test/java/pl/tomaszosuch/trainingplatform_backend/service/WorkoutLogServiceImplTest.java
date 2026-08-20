@@ -111,7 +111,7 @@ public class WorkoutLogServiceImplTest {
                 .build();
 
         logResponse = new WorkoutLogResponse(
-                LOG_ID, CATEGORY_ID, "Taniec", "#9B59B6", null,
+                LOG_ID, null, CATEGORY_ID, "Taniec", "#9B59B6", null,
                 LocalDate.now(), null, 60, 7, null);
     }
 
@@ -230,7 +230,7 @@ public class WorkoutLogServiceImplTest {
     @DisplayName("powinien utworzyć wpis ad-hoc gdy planId jest null")
     public void shouldCreateAdHocLogWhenPlanIdIsNull() {
         WorkoutLogRequest request = new WorkoutLogRequest(
-                CATEGORY_ID, null, LocalDate.now(), null, 60, 7, null);
+                null, CATEGORY_ID, null, LocalDate.now(), null, 60, 7, null);
 
         when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
         when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
@@ -248,7 +248,7 @@ public class WorkoutLogServiceImplTest {
     @DisplayName("powinien utworzyć wpis powiązany z planem gdy planId podano")
     void shouldCreateLogLinkedToPlanWhenPlanIdProvided() {
         WorkoutLogRequest request = new WorkoutLogRequest(
-                CATEGORY_ID, PLAN_ID, LocalDate.now(), null, 60, 7, null);
+                null, CATEGORY_ID, PLAN_ID, LocalDate.now(), null, 60, 7, null);
 
         when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
         when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
@@ -265,7 +265,7 @@ public class WorkoutLogServiceImplTest {
     @DisplayName("powinien rzucić wyjątek gdy użytkownik nie istnieje")
     void shouldThrowWhenUserNotFound() {
         WorkoutLogRequest request = new WorkoutLogRequest(
-                CATEGORY_ID, null, LocalDate.now(), null, 60, 7, null);
+                null, CATEGORY_ID, null, LocalDate.now(), null, 60, 7, null);
 
         when(userRepository.findById(OWNER_ID)).thenReturn(Optional.empty());
 
@@ -279,7 +279,7 @@ public class WorkoutLogServiceImplTest {
     @DisplayName("powinien rzucić wyjątek gdy kategoria nie istnieje")
     void shouldThrowWhenCategoryNotFound() {
         WorkoutLogRequest request = new WorkoutLogRequest(
-                CATEGORY_ID, null, LocalDate.now(), null, 60, 7, null);
+                null, CATEGORY_ID, null, LocalDate.now(), null, 60, 7, null);
 
         when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
         when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.empty());
@@ -294,7 +294,7 @@ public class WorkoutLogServiceImplTest {
     @DisplayName("powinien rzucić wyjątek gdy podany plan nie istnieje")
     void shouldThrowWhenPlanNotFound() {
         WorkoutLogRequest request = new WorkoutLogRequest(
-                CATEGORY_ID, PLAN_ID, LocalDate.now(), null, 60, 7, null);
+                null, CATEGORY_ID, PLAN_ID, LocalDate.now(), null, 60, 7, null);
 
         when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
         when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
@@ -314,7 +314,7 @@ public class WorkoutLogServiceImplTest {
                 .id(PLAN_ID).user(otherUser).build();
 
         WorkoutLogRequest request = new WorkoutLogRequest(
-                CATEGORY_ID, PLAN_ID, LocalDate.now(), null, 60, 7, null);
+                null, CATEGORY_ID, PLAN_ID, LocalDate.now(), null, 60, 7, null);
 
         when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
         when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
@@ -330,7 +330,7 @@ public class WorkoutLogServiceImplTest {
     @DisplayName("powinien zaktualizować wpis gdy należy do użytkownika")
     void shouldUpdateLogWhenOwned() {
         WorkoutLogRequest request = new WorkoutLogRequest(
-                CATEGORY_ID, null, LocalDate.now(), null, 90, 9, "świetny trening");
+                null, CATEGORY_ID, null, LocalDate.now(), null, 90, 9, "świetny trening");
 
         when(workoutLogRepository.findById(LOG_ID)).thenReturn(Optional.of(log));
         when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
@@ -356,7 +356,7 @@ public class WorkoutLogServiceImplTest {
     @DisplayName("powinien rzucić 403 gdy edytowany wpis należy do innego użytkownika")
     void shouldThrowAccessDeniedWhenUpdatingNotOwnedLog() {
         WorkoutLogRequest request = new WorkoutLogRequest(
-                CATEGORY_ID, null, LocalDate.now(), null, 90, 9, "próba edycji cudzego wpisu");
+                null, CATEGORY_ID, null, LocalDate.now(), null, 90, 9, "próba edycji cudzego wpisu");
 
         when(workoutLogRepository.findById(LOG_ID)).thenReturn(Optional.of(log));
 
@@ -381,7 +381,7 @@ public class WorkoutLogServiceImplTest {
     @DisplayName("powinien rzucić 404 gdy edytowany wpis nie istnieje")
     void shouldThrowNotFoundWhenUpdatingNonExistingLog() {
         WorkoutLogRequest request = new WorkoutLogRequest(
-                CATEGORY_ID, null, LocalDate.now(), null, 60, 5, null);
+                null, CATEGORY_ID, null, LocalDate.now(), null, 60, 5, null);
 
         when(workoutLogRepository.findById(LOG_ID)).thenReturn(Optional.empty());
 
@@ -408,7 +408,7 @@ public class WorkoutLogServiceImplTest {
         LocalTime performedTime = LocalTime.of(18, 30);
 
         WorkoutLogRequest request = new WorkoutLogRequest(
-                CATEGORY_ID, null, LocalDate.now(), performedTime, 60, 7, null);
+                null, CATEGORY_ID, null, LocalDate.now(), performedTime, 60, 7, null);
 
         when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
         when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
@@ -424,7 +424,7 @@ public class WorkoutLogServiceImplTest {
     @DisplayName("powinien zapisać wpis bez godziny gdy nie została podana")
     void shouldPersistLogWithoutPerformedTime() {
         WorkoutLogRequest request = new WorkoutLogRequest(
-                CATEGORY_ID, null, LocalDate.now(), null, 60, 7, null);
+                null, CATEGORY_ID, null, LocalDate.now(), null, 60, 7, null);
 
         when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
         when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
@@ -434,5 +434,37 @@ public class WorkoutLogServiceImplTest {
         workoutLogService.create(OWNER_ID, request);
 
         verify(workoutLogRepository).save(argThat(l -> l.getPerformedTime() == null));
+    }
+
+    @Test
+    @DisplayName("powinien zapisać tytuł wpisu gdy został podany")
+    void shouldPersistTitleWhenProvided() {
+        WorkoutLogRequest request = new WorkoutLogRequest(
+                "Salsa — zajęcia grupowe", CATEGORY_ID, null, LocalDate.now(), null, 60, 7, null);
+
+        when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
+        when(workoutLogRepository.save(any(WorkoutLog.class))).thenReturn(log);
+        when(workoutLogMapper.toResponse(any(WorkoutLog.class))).thenReturn(logResponse);
+
+        workoutLogService.create(OWNER_ID, request);
+
+        verify(workoutLogRepository).save(argThat(l -> "Salsa — zajęcia grupowe".equals(l.getTitle())));
+    }
+
+    @Test
+    @DisplayName("powinien zapisać wpis bez tytułu gdy nie został podany")
+    void shouldPersistLogWithoutTitle() {
+        WorkoutLogRequest request = new WorkoutLogRequest(
+                null, CATEGORY_ID, null, LocalDate.now(), null, 60, 7, null);
+
+        when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
+        when(workoutLogRepository.save(any(WorkoutLog.class))).thenReturn(log);
+        when(workoutLogMapper.toResponse(any(WorkoutLog.class))).thenReturn(logResponse);
+
+        workoutLogService.create(OWNER_ID, request);
+
+        verify(workoutLogRepository).save(argThat(l -> l.getTitle() == null));
     }
 }
