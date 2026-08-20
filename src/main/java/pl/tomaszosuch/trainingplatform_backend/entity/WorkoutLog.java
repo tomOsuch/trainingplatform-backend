@@ -46,6 +46,9 @@ public class WorkoutLog {
     @JoinColumn(name = "category_id", nullable = false)
     private WorkoutCategory category;
 
+    @Column(name = "title")
+    private String title;
+
     @Column(name = "performed_date", nullable = false)
     private LocalDate performedDate;
 

@@ -71,6 +71,7 @@ public class WorkoutLogServiceImpl implements WorkoutLogService {
                 .user(user)
                 .category(category)
                 .plan(plan)
+                .title(request.title())
                 .performedDate(request.performedDate())
                 .performedTime(request.performedTime())
                 .durationMin(request.durationMin())
@@ -90,6 +91,7 @@ public class WorkoutLogServiceImpl implements WorkoutLogService {
 
         log.setCategory(category);
         log.setPlan(resolvePlan(request.planId(), userId));
+        log.setTitle(request.title());
         log.setPerformedDate(request.performedDate());
         log.setPerformedTime(request.performedTime());
         log.setDurationMin(request.durationMin());

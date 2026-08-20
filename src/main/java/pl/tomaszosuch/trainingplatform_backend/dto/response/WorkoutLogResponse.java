@@ -5,6 +5,7 @@ import java.time.LocalTime;
 
 public record WorkoutLogResponse(
         Long id,
+        String title,
         Long categoryId,
         String categoryName,
         String categoryColor,
