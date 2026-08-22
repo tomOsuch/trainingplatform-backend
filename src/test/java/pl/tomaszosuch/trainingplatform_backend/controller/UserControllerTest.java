@@ -29,7 +29,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @WebMvcTest(controllers = UserController.class, excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE, classes = JwtAuthenticationFilter.class))
 @WithMockUser
@@ -106,7 +106,7 @@ public class UserControllerTest {
         
                 // given
                 UpdateProfileRequest request = new UpdateProfileRequest(
-                        "Anna", "Nowak", LocalDateTime.now()
+                        "Anna", "Nowak", LocalDate.of(1990, 5, 14)
                 );
 
                 when(userService.updateUserProfile(eq(1L), any(UpdateProfileRequest.class)))
@@ -129,7 +129,7 @@ public class UserControllerTest {
         public void shouldReturnBadRequestWhenFirstNameIsEmptyDuringProfileUpdate() throws Exception {
                 // given
                 UpdateProfileRequest request = new UpdateProfileRequest(
-                        "", "Nowak", LocalDateTime.now()
+                        "", "Nowak", LocalDate.of(1990, 5, 14)
                 );
 
                 // when & then
@@ -149,7 +149,7 @@ public class UserControllerTest {
         public void shouldReturnBadRequestWhenLastNameIsEmptyDuringProfileUpdate() throws Exception {
                 // given
                 UpdateProfileRequest request = new UpdateProfileRequest(
-                        "Anna", "", LocalDateTime.now()
+                        "Anna", "", LocalDate.of(1990, 5, 14)
                 );
 
                 // when & then
@@ -169,7 +169,7 @@ public class UserControllerTest {
         void shouldReturn400WhenBirthDateIsInFuture() throws Exception {
             // given
             UpdateProfileRequest invalidRequest = new UpdateProfileRequest(
-                "Anna", "Nowak", LocalDateTime.now().plusDays(1)
+                "Anna", "Nowak", LocalDate.now().plusDays(1)
             );
 
             // when & then
