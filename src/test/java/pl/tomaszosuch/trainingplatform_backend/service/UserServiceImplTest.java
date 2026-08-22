@@ -94,7 +94,7 @@ public class UserServiceImplTest {
     @DisplayName("powinien zaktualizowac dane profilu")
     public void shouldUpdateUserProfileData() {
         // given
-        UpdateProfileRequest updateRequest = new UpdateProfileRequest("Jan", "Kowalski", java.time.LocalDateTime.now());
+        UpdateProfileRequest updateRequest = new UpdateProfileRequest("Jan", "Kowalski", java.time.LocalDate.now());
         when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(existingUser));
         when(userRepository.save(existingUser)).thenReturn(existingUser);
         when(userMapper.toResponse(any(User.class)))
@@ -113,7 +113,7 @@ public class UserServiceImplTest {
     @DisplayName("powinien rzucic wyjatek gdy uzytkownik do aktualizacji nie istnieje")
     public void shouldThrowExceptionWhenUpdatingNonExistingUser() {
         // give
-        UpdateProfileRequest updateRequest = new UpdateProfileRequest("Jan", "Kowalski", java.time.LocalDateTime.now());
+        UpdateProfileRequest updateRequest = new UpdateProfileRequest("Jan", "Kowalski", java.time.LocalDate.now());
         when(userRepository.findById(99L)).thenReturn(java.util.Optional.empty());
 
         // when & then
