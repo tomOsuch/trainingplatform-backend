@@ -11,6 +11,9 @@ spring:
       ddl-auto: create-drop
     open-in-view: false
 
+  flyway:
+    enabled: false
+
 jwt:
   secret: test-secret-key-change-me-in-production-minimum-64-bytes-long-12345678
   expiration: 86400000
