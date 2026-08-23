@@ -17,7 +17,7 @@ import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
-import pl.tomaszosuch.trainingplatform_backend.service.impl.UserServiceImpl;
+import pl.tomaszosuch.trainingplatform_backend.service.impl.ProfileServiceImpl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -32,11 +32,11 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("UserServiceImplTest")
-public class UserServiceImplTest {
+@DisplayName("ProfileServiceImplTest")
+public class ProfileServiceImplTest {
 
     @InjectMocks
-    private UserServiceImpl userService;
+    private ProfileServiceImpl profileService;
 
     @Mock
     private UserRepository userRepository;
@@ -71,7 +71,7 @@ public class UserServiceImplTest {
                 .thenReturn(new UserResponse(1L, "jan@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER));
 
         // when
-        UserResponse response = userService.getUserProfile(1L);
+        UserResponse response = profileService.getProfile(1L);
 
         // then
         assertNotNull(response);
@@ -88,7 +88,7 @@ public class UserServiceImplTest {
         when(userRepository.findById(99L)).thenReturn(java.util.Optional.empty());
 
         // when & then
-        assertThrows(UserNotFoundException.class, () -> userService.getUserProfile(99L));
+        assertThrows(UserNotFoundException.class, () -> profileService.getProfile(99L));
     }
 
     @Test
@@ -102,7 +102,7 @@ public class UserServiceImplTest {
                 .thenReturn(new UserResponse(1L, "jan@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER));
 
         // when
-        UserResponse updatedProfile = userService.updateUserProfile(1L, updateRequest);
+        UserResponse updatedProfile = profileService.updateProfile(1L, updateRequest);
 
         // then
         assertNotNull(updatedProfile);
@@ -118,7 +118,7 @@ public class UserServiceImplTest {
         when(userRepository.findById(99L)).thenReturn(java.util.Optional.empty());
 
         // when & then
-        assertThrows(UserNotFoundException.class, () -> userService.updateUserProfile(99L, updateRequest));
+        assertThrows(UserNotFoundException.class, () -> profileService.updateProfile(99L, updateRequest));
     }
 
     @Test
@@ -135,7 +135,7 @@ public class UserServiceImplTest {
         when(passwordEncoder.encode("newSecurePassword")).thenReturn("$2a$10$noweZahashowane");
 
         // when
-        userService.changePassword(1L, changePasswordRequest);
+        profileService.changePassword(1L, changePasswordRequest);
 
         // then
         verify(userRepository).save(argThat(user -> user.getPassword().equals("$2a$10$noweZahashowane")));
@@ -153,7 +153,7 @@ public class UserServiceImplTest {
         // when & then
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> userService.changePassword(1L, changePasswordRequest));
+                () -> profileService.changePassword(1L, changePasswordRequest));
 
         assertEquals("Podane hasło jest nieprawidłowe", exception.getMessage());
         verify(userRepository, never()).save(any());
@@ -174,7 +174,7 @@ public class UserServiceImplTest {
         // when & then
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> userService.changePassword(1L, request));
+                () -> profileService.changePassword(1L, request));
 
         assertEquals("Hasła nie są zgodne", exception.getMessage());
         verify(userRepository, never()).save(any());
@@ -197,7 +197,7 @@ public class UserServiceImplTest {
         // when & then
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> userService.changePassword(1L, request));
+                () -> profileService.changePassword(1L, request));
 
         assertEquals("Nowe hasło musi różnić się od aktualnego",
                 exception.getMessage());
@@ -216,7 +216,7 @@ public class UserServiceImplTest {
 
         // when & then
         assertThrows(UserNotFoundException.class,
-                () -> userService.changePassword(99L, request));
+                () -> profileService.changePassword(99L, request));
 
         verify(userRepository, never()).save(any());
     }

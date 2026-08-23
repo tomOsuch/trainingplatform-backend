@@ -4,9 +4,9 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.ChangePasswordRequest
 import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 
-public interface UserService {
+public interface ProfileService {
 
-    UserResponse getUserProfile(Long id);
-    UserResponse updateUserProfile(Long id, UpdateProfileRequest request);
+    UserResponse getProfile(Long id);
+    UserResponse updateProfile(Long id, UpdateProfileRequest request);
     void changePassword(Long id, ChangePasswordRequest request);
 }

@@ -17,7 +17,7 @@ import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
-import pl.tomaszosuch.trainingplatform_backend.service.UserService;
+import pl.tomaszosuch.trainingplatform_backend.service.ProfileService;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -43,7 +43,7 @@ public class ProfileControllerTest {
         private ObjectMapper objectMapper;
 
         @MockitoBean
-        private UserService userService;
+        private ProfileService profileService;
 
         private User currentUser;
         private UserResponse userResponse;
@@ -72,7 +72,7 @@ public class ProfileControllerTest {
         @DisplayName("powinien zrobic 200 z profilem zalogowanego uzytkownika")
         public void shouldReturnUserProfileWhenUserIsAuthenticated() throws Exception {
                 // given
-                when(userService.getUserProfile(1L)).thenReturn(userResponse);
+                when(profileService.getProfile(1L)).thenReturn(userResponse);
 
                 // when & then
                 mockMvc.perform(get("/profile")
@@ -85,7 +85,7 @@ public class ProfileControllerTest {
                                 .andExpect(jsonPath("$.birthDate").value("1990-05-14"))
                                 .andExpect(jsonPath("$.role").value("USER"));
 
-                verify(userService).getUserProfile(1L);
+                verify(profileService).getProfile(1L);
         }
 
         @Test
@@ -93,7 +93,7 @@ public class ProfileControllerTest {
         public void shouldReturnNotFoundWhenUserDoesNotExist() throws Exception {
 
                 // given
-                when(userService.getUserProfile(1L)).thenThrow(new UserNotFoundException("User not found"));
+                when(profileService.getProfile(1L)).thenThrow(new UserNotFoundException("User not found"));
 
                 // when & then
                 mockMvc.perform(get("/profile")
@@ -111,7 +111,7 @@ public class ProfileControllerTest {
                         "Anna", "Nowak", LocalDate.of(1990, 5, 14)
                 );
 
-                when(userService.updateUserProfile(eq(1L), any(UpdateProfileRequest.class)))
+                when(profileService.updateProfile(eq(1L), any(UpdateProfileRequest.class)))
                         .thenReturn(userResponse);
 
                 // when & then
@@ -123,7 +123,7 @@ public class ProfileControllerTest {
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.id").value(1L));
 
-                verify(userService).updateUserProfile(eq(1L), any(UpdateProfileRequest.class));
+                verify(profileService).updateProfile(eq(1L), any(UpdateProfileRequest.class));
         }
 
         @Test
@@ -143,7 +143,7 @@ public class ProfileControllerTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.status").value(400));
 
-                verify(userService, never()).updateUserProfile(anyLong(), any(UpdateProfileRequest.class));
+                verify(profileService, never()).updateProfile(anyLong(), any(UpdateProfileRequest.class));
         }
 
         @Test
@@ -163,7 +163,7 @@ public class ProfileControllerTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.status").value(400));    
 
-                verify(userService, never()).updateUserProfile(anyLong(), any(UpdateProfileRequest.class));
+                verify(profileService, never()).updateProfile(anyLong(), any(UpdateProfileRequest.class));
         }
 
           @Test
@@ -183,7 +183,7 @@ public class ProfileControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.birthDate").exists());
 
-            verify(userService, never()).updateUserProfile(any(), any());
+            verify(profileService, never()).updateProfile(any(), any());
         }
 
         @Test
@@ -193,7 +193,7 @@ public class ProfileControllerTest {
             UpdateProfileRequest request = new UpdateProfileRequest(
                 "Anna", "Nowak", null);
 
-            when(userService.updateUserProfile(eq(1L), any(UpdateProfileRequest.class)))
+            when(profileService.updateProfile(eq(1L), any(UpdateProfileRequest.class)))
                 .thenThrow(new UserNotFoundException(1L));
 
             // when & then
@@ -212,7 +212,7 @@ public class ProfileControllerTest {
             ChangePasswordRequest request = new ChangePasswordRequest(
                 "stareHaslo", "noweHaslo123", "noweHaslo123");
 
-            doNothing().when(userService)
+            doNothing().when(profileService)
                 .changePassword(eq(1L), any(ChangePasswordRequest.class));
 
             // when & then
@@ -223,7 +223,7 @@ public class ProfileControllerTest {
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-            verify(userService).changePassword(eq(1L), any(ChangePasswordRequest.class));
+            verify(profileService).changePassword(eq(1L), any(ChangePasswordRequest.class));
         }
 
         @Test
@@ -242,7 +242,7 @@ public class ProfileControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.currentPassword").exists());
 
-            verify(userService, never()).changePassword(any(), any());
+            verify(profileService, never()).changePassword(any(), any());
         }
 
         @Test
@@ -261,7 +261,7 @@ public class ProfileControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.newPassword").exists());
 
-            verify(userService, never()).changePassword(any(), any());
+            verify(profileService, never()).changePassword(any(), any());
         }
 
         @Test
@@ -272,7 +272,7 @@ public class ProfileControllerTest {
                 "stareHaslo", "noweHaslo123", "inneHaslo123");
 
             doThrow(new IllegalArgumentException("Hasła nie są zgodne"))
-                .when(userService).changePassword(eq(1L), any());
+                .when(profileService).changePassword(eq(1L), any());
 
             // when & then
             mockMvc.perform(post("/profile/change-password")
@@ -293,7 +293,7 @@ public class ProfileControllerTest {
 
             doThrow(new IllegalArgumentException(
                     "Nowe hasło musi różnić się od aktualnego"))
-                .when(userService).changePassword(eq(1L), any());
+                .when(profileService).changePassword(eq(1L), any());
 
             // when & then
             mockMvc.perform(post("/profile/change-password")
@@ -314,7 +314,7 @@ public class ProfileControllerTest {
                 "stareHaslo", "noweHaslo123", "noweHaslo123");
 
             doThrow(new UserNotFoundException(1L))
-                .when(userService).changePassword(eq(1L), any());
+                .when(profileService).changePassword(eq(1L), any());
 
             // when & then
             mockMvc.perform(post("/profile/change-password")

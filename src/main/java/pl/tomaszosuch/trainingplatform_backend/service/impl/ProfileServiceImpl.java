@@ -11,18 +11,18 @@ import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
-import pl.tomaszosuch.trainingplatform_backend.service.UserService;
+import pl.tomaszosuch.trainingplatform_backend.service.ProfileService;
 
 @Service
 @RequiredArgsConstructor
-public class UserServiceImpl implements UserService {
+public class ProfileServiceImpl implements ProfileService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
 
     @Override
-    public UserResponse getUserProfile(Long id) {
+    public UserResponse getProfile(Long id) {
         
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
@@ -31,7 +31,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserResponse updateUserProfile(Long id, UpdateProfileRequest request) {
+    public UserResponse updateProfile(Long id, UpdateProfileRequest request) {
         
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));

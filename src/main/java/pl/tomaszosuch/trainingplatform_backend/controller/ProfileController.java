@@ -9,7 +9,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.ChangePasswordRequest
 import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
-import pl.tomaszosuch.trainingplatform_backend.service.UserService;
+import pl.tomaszosuch.trainingplatform_backend.service.ProfileService;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,13 +23,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 @RequiredArgsConstructor
 public class ProfileController {
 
-    private final UserService userService;
+    private final ProfileService profileService;
 
     @GetMapping
     public ResponseEntity<UserResponse> getProfile(
             @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(
-            userService.getUserProfile(currentUser.getId()));
+            profileService.getProfile(currentUser.getId()));
     }
 
     @PutMapping
@@ -37,14 +37,14 @@ public class ProfileController {
             @AuthenticationPrincipal User currentUser,
             @Valid @RequestBody UpdateProfileRequest request) {
         return ResponseEntity.ok(
-            userService.updateUserProfile(currentUser.getId(), request));
+            profileService.updateProfile(currentUser.getId(), request));
     }
 
     @PostMapping("/change-password")
     public ResponseEntity<Void> changePassword(
             @AuthenticationPrincipal User currentUser,
             @Valid @RequestBody ChangePasswordRequest request) {
-        userService.changePassword(currentUser.getId(), request);
+        profileService.changePassword(currentUser.getId(), request);
         return ResponseEntity.ok().build();
     }
     
