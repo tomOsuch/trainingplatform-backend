@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 @RestController
 @RequestMapping("/profile")
 @RequiredArgsConstructor
-public class UserController {
+public class ProfileController {
 
     private final UserService userService;
 

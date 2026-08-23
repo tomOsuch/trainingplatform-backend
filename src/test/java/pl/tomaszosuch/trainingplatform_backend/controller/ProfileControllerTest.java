@@ -31,10 +31,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.LocalDate;
 
-@WebMvcTest(controllers = UserController.class, excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE, classes = JwtAuthenticationFilter.class))
+@WebMvcTest(controllers = ProfileController.class, excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE, classes = JwtAuthenticationFilter.class))
 @WithMockUser
-@DisplayName("UserControllerTest")
-public class UserControllerTest {
+@DisplayName("ProfileControllerTest")
+public class ProfileControllerTest {
 
         @Autowired
         private MockMvc mockMvc;
