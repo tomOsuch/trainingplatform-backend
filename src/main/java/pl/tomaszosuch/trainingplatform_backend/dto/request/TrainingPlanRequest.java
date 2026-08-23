@@ -9,11 +9,11 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 public record TrainingPlanRequest(
-        @NotBlank(message = "Title is required") @Size(max = 200, message = "Title cannot exceed 200 characters") String title,
-        @NotNull(message = "Category ID is required") Long categoryId,
-        @NotNull(message = "Planned date is required") LocalDate plannedDate,
+        @NotBlank(message = "Tytuł jest wymagany") @Size(max = 200, message = "Tytuł może mieć maksymalnie 200 znaków") String title,
+        @NotNull(message = "Kategoria jest wymagana") Long categoryId,
+        @NotNull(message = "Data treningu jest wymagana") LocalDate plannedDate,
         LocalTime plannedTime,
-        @Positive(message = "Duration must be a positive number") Integer durationMin,
+        @Positive(message = "Czas trwania musi być większy od 0") Integer durationMin,
         String notes) {
 
 }

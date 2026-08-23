@@ -5,16 +5,16 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record WorkoutCategoryRequest(
-    
-    @NotBlank(message = "Name is required and cannot be null.")
-    @Size(min = 1, max = 100, message = "Name must be between 1 and 100 characters.")
-    String name,
 
-    @Pattern(regexp = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", message = "Color must be a valid hex code, e.g., #FFFFFF or #FFF.")
-    String color,
+        @NotBlank(message = "Nazwa kategorii jest wymagana")
+        @Size(min = 1, max = 100, message = "Nazwa musi mieć od 1 do 100 znaków")
+        String name,
 
-    @Size(max = 255, message = "Icon name must be at most 255 characters.")
-    String iconName
+        @Pattern(regexp = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", message = "Kolor musi być poprawnym kodem HEX, np. #FFFFFF lub #FFF")
+        String color,
+
+        @Size(max = 255, message = "Nazwa ikony może mieć maksymalnie 255 znaków")
+        String iconName
 ) {
 
 }

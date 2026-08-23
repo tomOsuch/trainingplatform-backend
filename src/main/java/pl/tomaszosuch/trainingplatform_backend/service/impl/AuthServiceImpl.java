@@ -27,7 +27,7 @@ public class AuthServiceImpl implements AuthService {
     public UserResponse register(RegisterRequest request) {
 
         if (userRepository.existsByEmail(request.email())) {
-            throw new IllegalArgumentException("Email already in use: " + request.email());
+            throw new IllegalArgumentException("Adres e-mail jest już zajęty: " + request.email());
         }
 
         User user = User.builder()
@@ -46,14 +46,14 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse login(LoginRequest request) {
         
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
+                .orElseThrow(() -> new IllegalArgumentException("Nieprawidłowy e-mail lub hasło"));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
-            throw new IllegalArgumentException("User account is inactive");
+            throw new IllegalArgumentException("Nieprawidłowy e-mail lub hasło");
         }
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new IllegalArgumentException("Invalid email or password");
+            throw new IllegalArgumentException("Nieprawidłowy e-mail lub hasło");
         }
 
 

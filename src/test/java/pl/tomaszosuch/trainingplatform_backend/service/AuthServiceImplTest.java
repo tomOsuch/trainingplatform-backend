@@ -236,7 +236,7 @@ public class AuthServiceImplTest {
                     IllegalArgumentException.class,
                     () -> authService.login(loginRequest));
 
-            assertTrue(ex.getMessage().contains("Invalid"));
+            assertTrue(ex.getMessage().contains("Nieprawidłowy"));
             verify(jwtTokenProvider, never()).generateToken(anyString());
         }
 
@@ -257,7 +257,7 @@ public class AuthServiceImplTest {
                 IllegalArgumentException.class,
                 () -> authService.login(loginRequest));
 
-        assertTrue(ex.getMessage().contains("Invalid"));
+        assertTrue(ex.getMessage().contains("Nieprawidłowy"));
         verify(jwtTokenProvider, never()).generateToken(anyString());
     }
 
@@ -286,7 +286,7 @@ public class AuthServiceImplTest {
                 IllegalArgumentException.class,
                 () -> authService.login(loginRequest));
 
-        assertTrue(ex.getMessage().contains("User account is inactive"));
+        assertTrue(ex.getMessage().contains("Nieprawidłowy"));
         verify(jwtTokenProvider, never()).generateToken(anyString());
     }
 

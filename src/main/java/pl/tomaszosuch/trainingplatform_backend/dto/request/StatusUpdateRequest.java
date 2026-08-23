@@ -4,8 +4,8 @@ import jakarta.validation.constraints.NotNull;
 import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
 
 public record StatusUpdateRequest(
-    @NotNull(message = "Status is required")
-    PlanStatus status
+        @NotNull(message = "Status jest wymagany")
+        PlanStatus status
 ) {
 
 }

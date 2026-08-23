@@ -123,7 +123,7 @@ public class AuthControllerTest {
         // given
         when(authService.register(any(RegisterRequest.class)))
                 .thenThrow(new IllegalArgumentException(
-                    "Email already in use: jan.kowalski@example.com"));
+                        "Adres e-mail jest już zajęty: jan.kowalski@example.com"));
 
         // when & then
         mockMvc.perform(post("/auth/register")
@@ -132,7 +132,7 @@ public class AuthControllerTest {
                     .content(objectMapper.writeValueAsString(validRegister)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(
-                    "Email already in use: jan.kowalski@example.com"));
+                        "Adres e-mail jest już zajęty: jan.kowalski@example.com"));
 
         verify(authService).register(any(RegisterRequest.class));
     }
@@ -162,7 +162,7 @@ public class AuthControllerTest {
     public void shouldReturn400WhenLoginIsInvalid() throws Exception {
         // given
         when(authService.login(any(LoginRequest.class)))
-                .thenThrow(new IllegalArgumentException("Invalid email or password"));
+                .thenThrow(new IllegalArgumentException("Nieprawidłowy e-mail lub hasło"));
 
         // when & then
         mockMvc.perform(post("/auth/login")
@@ -170,7 +170,7 @@ public class AuthControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(validLogin)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Invalid email or password"));
+                .andExpect(jsonPath("$.message").value("Nieprawidłowy e-mail lub hasło"));
 
         verify(authService).login(any(LoginRequest.class));
     }

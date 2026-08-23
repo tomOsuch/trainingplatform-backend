@@ -164,7 +164,7 @@ public class WorkoutCategoryServiceImplTest {
                 IllegalArgumentException.class,
                 () -> workoutCategoryService.createCategory(request));
 
-        assertTrue(ex.getMessage().contains("already exists"));
+        assertTrue(ex.getMessage().contains("już istnieje"));
         verify(workoutCategoryRepository, never()).save(any());
     }
 
