@@ -9,6 +9,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.LoginResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
+import pl.tomaszosuch.trainingplatform_backend.exception.InvalidCredentialsException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtTokenProvider;
@@ -46,14 +47,14 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse login(LoginRequest request) {
         
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new IllegalArgumentException("Nieprawidłowy e-mail lub hasło"));
+                .orElseThrow(InvalidCredentialsException::new);
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
-            throw new IllegalArgumentException("Nieprawidłowy e-mail lub hasło");
+            throw new InvalidCredentialsException();
         }
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new IllegalArgumentException("Nieprawidłowy e-mail lub hasło");
+            throw new InvalidCredentialsException();
         }
 
 

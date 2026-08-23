@@ -22,6 +22,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.LoginRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.LoginResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
+import pl.tomaszosuch.trainingplatform_backend.exception.InvalidCredentialsException;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AuthServiceImpl;
 
@@ -158,18 +159,18 @@ public class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("powinien zwrócić 400 gdy dane logowania są błędne")
-    public void shouldReturn400WhenLoginIsInvalid() throws Exception {
+    @DisplayName("powinien zwrócić 401 gdy dane logowania są błędne")
+    public void shouldReturn401WhenLoginIsInvalid() throws Exception {
         // given
         when(authService.login(any(LoginRequest.class)))
-                .thenThrow(new IllegalArgumentException("Nieprawidłowy e-mail lub hasło"));
+                .thenThrow(new InvalidCredentialsException());
 
         // when & then
         mockMvc.perform(post("/auth/login")
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(validLogin)))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("Nieprawidłowy e-mail lub hasło"));
 
         verify(authService).login(any(LoginRequest.class));
