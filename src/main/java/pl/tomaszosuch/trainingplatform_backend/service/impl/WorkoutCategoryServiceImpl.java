@@ -18,6 +18,7 @@ import pl.tomaszosuch.trainingplatform_backend.service.WorkoutCategoryService;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class WorkoutCategoryServiceImpl implements WorkoutCategoryService {
     
     private final WorkoutCategoryRepository workoutCategoryRepository;
@@ -35,6 +36,7 @@ public class WorkoutCategoryServiceImpl implements WorkoutCategoryService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public WorkoutCategoryResponse getCategoryById(Long id) {
         return workoutCategoryRepository.findById(id)
             .map(workoutCategoryMapper::toResponse)
@@ -42,6 +44,7 @@ public class WorkoutCategoryServiceImpl implements WorkoutCategoryService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public WorkoutCategoryResponse getCategoryByName(String name) {
         
         return workoutCategoryRepository.findAll().stream()
