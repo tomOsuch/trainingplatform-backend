@@ -28,6 +28,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
+import pl.tomaszosuch.trainingplatform_backend.exception.InvalidCredentialsException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtTokenProvider;
@@ -232,11 +233,11 @@ public class AuthServiceImplTest {
                     .thenReturn(java.util.Optional.empty());
 
             // when & then
-            IllegalArgumentException ex = assertThrows(
-                    IllegalArgumentException.class,
+            InvalidCredentialsException ex = assertThrows(
+                    InvalidCredentialsException.class,
                     () -> authService.login(loginRequest));
 
-            assertTrue(ex.getMessage().contains("Invalid"));
+            assertTrue(ex.getMessage().contains("Nieprawidłowy"));
             verify(jwtTokenProvider, never()).generateToken(anyString());
         }
 
@@ -253,11 +254,11 @@ public class AuthServiceImplTest {
         when(passwordEncoder.matches(loginRequest.password(), savedUser.getPassword())).thenReturn(false);
 
         // when & then
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
+        InvalidCredentialsException ex = assertThrows(
+                InvalidCredentialsException.class,
                 () -> authService.login(loginRequest));
 
-        assertTrue(ex.getMessage().contains("Invalid"));
+        assertTrue(ex.getMessage().contains("Nieprawidłowy"));
         verify(jwtTokenProvider, never()).generateToken(anyString());
     }
 
@@ -282,11 +283,11 @@ public class AuthServiceImplTest {
                 .thenReturn(java.util.Optional.of(inactiveUser));
 
         // when & then
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
+        InvalidCredentialsException ex = assertThrows(
+                InvalidCredentialsException.class,
                 () -> authService.login(loginRequest));
 
-        assertTrue(ex.getMessage().contains("User account is inactive"));
+        assertTrue(ex.getMessage().contains("Nieprawidłowy"));
         verify(jwtTokenProvider, never()).generateToken(anyString());
     }
 

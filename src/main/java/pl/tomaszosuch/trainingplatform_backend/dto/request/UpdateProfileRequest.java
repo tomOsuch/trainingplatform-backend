@@ -8,13 +8,13 @@ import jakarta.validation.constraints.Size;
 
 public record UpdateProfileRequest(
 
-        @NotBlank(message = "First name cannot be blank")
-        @Size(max = 100, message = "First name cannot exceed 100 characters")
+        @NotBlank(message = "Imię jest wymagane")
+        @Size(max = 100, message = "Imię może mieć maksymalnie 100 znaków")
         String firstName,
-        @NotBlank(message = "Last name cannot be blank")
-        @Size(max = 100, message = "Last name cannot exceed 100 characters")
+        @NotBlank(message = "Nazwisko jest wymagane")
+        @Size(max = 100, message = "Nazwisko może mieć maksymalnie 100 znaków")
         String lastName,
-        @Past(message = "Birth date must be in the past")
+        @Past(message = "Data urodzenia musi być z przeszłości")
         LocalDate birthDate
 ) {
 

@@ -1,4 +1,4 @@
-package pl.tomaszosuch.trainingplatform_backend.service;
+package pl.tomaszosuch.trainingplatform_backend.controller;
 
 import java.util.List;
 
@@ -18,10 +18,10 @@ import org.springframework.http.MediaType;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 
-import pl.tomaszosuch.trainingplatform_backend.controller.WorkoutCategoryController;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.WorkoutCategoryRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.WorkoutCategoryResponse;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
+import pl.tomaszosuch.trainingplatform_backend.service.WorkoutCategoryService;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;

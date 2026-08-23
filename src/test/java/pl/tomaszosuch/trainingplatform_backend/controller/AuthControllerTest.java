@@ -22,6 +22,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.LoginRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.LoginResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
+import pl.tomaszosuch.trainingplatform_backend.exception.InvalidCredentialsException;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AuthServiceImpl;
 
@@ -123,7 +124,7 @@ public class AuthControllerTest {
         // given
         when(authService.register(any(RegisterRequest.class)))
                 .thenThrow(new IllegalArgumentException(
-                    "Email already in use: jan.kowalski@example.com"));
+                        "Adres e-mail jest już zajęty: jan.kowalski@example.com"));
 
         // when & then
         mockMvc.perform(post("/auth/register")
@@ -132,7 +133,7 @@ public class AuthControllerTest {
                     .content(objectMapper.writeValueAsString(validRegister)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(
-                    "Email already in use: jan.kowalski@example.com"));
+                        "Adres e-mail jest już zajęty: jan.kowalski@example.com"));
 
         verify(authService).register(any(RegisterRequest.class));
     }
@@ -158,19 +159,19 @@ public class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("powinien zwrócić 400 gdy dane logowania są błędne")
-    public void shouldReturn400WhenLoginIsInvalid() throws Exception {
+    @DisplayName("powinien zwrócić 401 gdy dane logowania są błędne")
+    public void shouldReturn401WhenLoginIsInvalid() throws Exception {
         // given
         when(authService.login(any(LoginRequest.class)))
-                .thenThrow(new IllegalArgumentException("Invalid email or password"));
+                .thenThrow(new InvalidCredentialsException());
 
         // when & then
         mockMvc.perform(post("/auth/login")
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(validLogin)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Invalid email or password"));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Nieprawidłowy e-mail lub hasło"));
 
         verify(authService).login(any(LoginRequest.class));
     }

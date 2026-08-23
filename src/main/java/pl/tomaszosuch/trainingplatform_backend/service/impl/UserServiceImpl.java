@@ -25,7 +25,7 @@ public class UserServiceImpl implements UserService {
     public UserResponse getUserProfile(Long id) {
         
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
+                .orElseThrow(() -> new UserNotFoundException(id));
 
         return userMapper.toResponse(user);
     }
@@ -34,7 +34,7 @@ public class UserServiceImpl implements UserService {
     public UserResponse updateUserProfile(Long id, UpdateProfileRequest request) {
         
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
+                .orElseThrow(() -> new UserNotFoundException(id));
 
         user.setFirstName(request.firstName());
         user.setLastName(request.lastName());
@@ -48,7 +48,7 @@ public class UserServiceImpl implements UserService {
     public void changePassword(Long id, ChangePasswordRequest request) {
         
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
+                .orElseThrow(() -> new UserNotFoundException(id));
 
         String newPassword = request.newPassword();
 
