@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PostMapping;
 
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/profile")
 @RequiredArgsConstructor
 public class UserController {
 

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
@@ -67,7 +68,7 @@ public class UserServiceImplTest {
         // given
         when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(existingUser));
         when(userMapper.toResponse(any(User.class)))
-                .thenReturn(new UserResponse(1L, "jan@example.com", "Jan", "Kowalski", Role.USER));
+                .thenReturn(new UserResponse(1L, "jan@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER));
 
         // when
         UserResponse response = userService.getUserProfile(1L);
@@ -98,7 +99,7 @@ public class UserServiceImplTest {
         when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(existingUser));
         when(userRepository.save(existingUser)).thenReturn(existingUser);
         when(userMapper.toResponse(any(User.class)))
-                .thenReturn(new UserResponse(1L, "jan@example.com", "Jan", "Kowalski", Role.USER));
+                .thenReturn(new UserResponse(1L, "jan@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER));
 
         // when
         UserResponse updatedProfile = userService.updateUserProfile(1L, updateRequest);

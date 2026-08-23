@@ -64,6 +64,7 @@ public class UserControllerTest {
                                 "jan@example.com",
                                 "Jan",
                                 "Kowalski",
+                                LocalDate.of(1990, 5, 14),
                                 Role.USER);
         }
 
@@ -74,13 +75,14 @@ public class UserControllerTest {
                 when(userService.getUserProfile(1L)).thenReturn(userResponse);
 
                 // when & then
-                mockMvc.perform(get("/users")
+                mockMvc.perform(get("/profile")
                                 .with(user(currentUser)))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.id").value(1L))
                                 .andExpect(jsonPath("$.email").value("jan@example.com"))
                                 .andExpect(jsonPath("$.firstName").value("Jan"))
                                 .andExpect(jsonPath("$.lastName").value("Kowalski"))
+                                .andExpect(jsonPath("$.birthDate").value("1990-05-14"))
                                 .andExpect(jsonPath("$.role").value("USER"));
 
                 verify(userService).getUserProfile(1L);
@@ -94,7 +96,7 @@ public class UserControllerTest {
                 when(userService.getUserProfile(1L)).thenThrow(new UserNotFoundException("User not found"));
 
                 // when & then
-                mockMvc.perform(get("/users")
+                mockMvc.perform(get("/profile")
                                 .with(user(currentUser)))
                                 .andExpect(status().isNotFound())
                                 .andExpect(jsonPath("$.status").value(404));
@@ -113,7 +115,7 @@ public class UserControllerTest {
                         .thenReturn(userResponse);
 
                 // when & then
-                mockMvc.perform(put("/users")
+                mockMvc.perform(put("/profile")
                                 .with(user(currentUser))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -133,7 +135,7 @@ public class UserControllerTest {
                 );
 
                 // when & then
-                mockMvc.perform(put("/users")
+                mockMvc.perform(put("/profile")
                                 .with(user(currentUser))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -153,7 +155,7 @@ public class UserControllerTest {
                 );
 
                 // when & then
-                mockMvc.perform(put("/users")
+                mockMvc.perform(put("/profile")
                                 .with(user(currentUser))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -173,7 +175,7 @@ public class UserControllerTest {
             );
 
             // when & then
-            mockMvc.perform(put("/users")
+            mockMvc.perform(put("/profile")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -195,7 +197,7 @@ public class UserControllerTest {
                 .thenThrow(new UserNotFoundException(1L));
 
             // when & then
-            mockMvc.perform(put("/users")
+            mockMvc.perform(put("/profile")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -214,7 +216,7 @@ public class UserControllerTest {
                 .changePassword(eq(1L), any(ChangePasswordRequest.class));
 
             // when & then
-            mockMvc.perform(post("/users/change-password")
+            mockMvc.perform(post("/profile/change-password")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -232,7 +234,7 @@ public class UserControllerTest {
                 "", "noweHaslo123", "noweHaslo123");
 
             // when & then
-            mockMvc.perform(post("/users/change-password")
+            mockMvc.perform(post("/profile/change-password")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -251,7 +253,7 @@ public class UserControllerTest {
                 "stareHaslo", "abc", "abc");
 
             // when & then
-            mockMvc.perform(post("/users/change-password")
+            mockMvc.perform(post("/profile/change-password")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -273,7 +275,7 @@ public class UserControllerTest {
                 .when(userService).changePassword(eq(1L), any());
 
             // when & then
-            mockMvc.perform(post("/users/change-password")
+            mockMvc.perform(post("/profile/change-password")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -294,7 +296,7 @@ public class UserControllerTest {
                 .when(userService).changePassword(eq(1L), any());
 
             // when & then
-            mockMvc.perform(post("/users/change-password")
+            mockMvc.perform(post("/profile/change-password")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -315,7 +317,7 @@ public class UserControllerTest {
                 .when(userService).changePassword(eq(1L), any());
 
             // when & then
-            mockMvc.perform(post("/users/change-password")
+            mockMvc.perform(post("/profile/change-password")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)

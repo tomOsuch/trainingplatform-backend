@@ -22,9 +22,12 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.LoginRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.LoginResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
+import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidCredentialsException;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AuthServiceImpl;
+
+import java.time.LocalDate;
 
 @WebMvcTest(controllers = AuthController.class,
     excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(
@@ -61,13 +64,13 @@ public class AuthControllerTest {
     void setUp() {
         validRegister = new RegisterRequest("Jan", "Kowalski", "jan.kowalski@example.com", "password");
         validLogin = new LoginRequest("jan.kowalski@example.com", "password");
-        userResponse = new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", pl.tomaszosuch.trainingplatform_backend.enums.Role.USER);
-        loginResponse = new LoginResponse("token", 1L, "jan.kowalski@example.com", pl.tomaszosuch.trainingplatform_backend.enums.Role.USER);
+        userResponse = new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER);
+        loginResponse = new LoginResponse("token", 1L, "jan.kowalski@example.com", Role.USER);
     }
 
     @Test
-    @DisplayName("powinien zwrócić 200 gdy rejestracja powiodła się")
-    public void shouldReturn200WhenRegistrationSucceeds() throws Exception {
+    @DisplayName("powinien zwrócić 201 gdy rejestracja powiodła się")
+    public void shouldReturn201WhenRegistrationSucceeds() throws Exception {
         //given
         when(authService.register(any(RegisterRequest.class))).thenReturn(userResponse);
         
@@ -76,7 +79,7 @@ public class AuthControllerTest {
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(validRegister)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.email").value("jan.kowalski@example.com"))
                 .andExpect(jsonPath("$.password").doesNotExist());
