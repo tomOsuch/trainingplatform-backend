@@ -17,7 +17,7 @@ import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
-import pl.tomaszosuch.trainingplatform_backend.service.UserService;
+import pl.tomaszosuch.trainingplatform_backend.service.ProfileService;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -31,10 +31,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.LocalDate;
 
-@WebMvcTest(controllers = UserController.class, excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE, classes = JwtAuthenticationFilter.class))
+@WebMvcTest(controllers = ProfileController.class, excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE, classes = JwtAuthenticationFilter.class))
 @WithMockUser
-@DisplayName("UserControllerTest")
-public class UserControllerTest {
+@DisplayName("ProfileControllerTest")
+public class ProfileControllerTest {
 
         @Autowired
         private MockMvc mockMvc;
@@ -43,7 +43,7 @@ public class UserControllerTest {
         private ObjectMapper objectMapper;
 
         @MockitoBean
-        private UserService userService;
+        private ProfileService profileService;
 
         private User currentUser;
         private UserResponse userResponse;
@@ -64,6 +64,7 @@ public class UserControllerTest {
                                 "jan@example.com",
                                 "Jan",
                                 "Kowalski",
+                                LocalDate.of(1990, 5, 14),
                                 Role.USER);
         }
 
@@ -71,19 +72,20 @@ public class UserControllerTest {
         @DisplayName("powinien zrobic 200 z profilem zalogowanego uzytkownika")
         public void shouldReturnUserProfileWhenUserIsAuthenticated() throws Exception {
                 // given
-                when(userService.getUserProfile(1L)).thenReturn(userResponse);
+                when(profileService.getProfile(1L)).thenReturn(userResponse);
 
                 // when & then
-                mockMvc.perform(get("/users")
+                mockMvc.perform(get("/profile")
                                 .with(user(currentUser)))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.id").value(1L))
                                 .andExpect(jsonPath("$.email").value("jan@example.com"))
                                 .andExpect(jsonPath("$.firstName").value("Jan"))
                                 .andExpect(jsonPath("$.lastName").value("Kowalski"))
+                                .andExpect(jsonPath("$.birthDate").value("1990-05-14"))
                                 .andExpect(jsonPath("$.role").value("USER"));
 
-                verify(userService).getUserProfile(1L);
+                verify(profileService).getProfile(1L);
         }
 
         @Test
@@ -91,10 +93,10 @@ public class UserControllerTest {
         public void shouldReturnNotFoundWhenUserDoesNotExist() throws Exception {
 
                 // given
-                when(userService.getUserProfile(1L)).thenThrow(new UserNotFoundException("User not found"));
+                when(profileService.getProfile(1L)).thenThrow(new UserNotFoundException("User not found"));
 
                 // when & then
-                mockMvc.perform(get("/users")
+                mockMvc.perform(get("/profile")
                                 .with(user(currentUser)))
                                 .andExpect(status().isNotFound())
                                 .andExpect(jsonPath("$.status").value(404));
@@ -109,11 +111,11 @@ public class UserControllerTest {
                         "Anna", "Nowak", LocalDate.of(1990, 5, 14)
                 );
 
-                when(userService.updateUserProfile(eq(1L), any(UpdateProfileRequest.class)))
+                when(profileService.updateProfile(eq(1L), any(UpdateProfileRequest.class)))
                         .thenReturn(userResponse);
 
                 // when & then
-                mockMvc.perform(put("/users")
+                mockMvc.perform(put("/profile")
                                 .with(user(currentUser))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -121,7 +123,7 @@ public class UserControllerTest {
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.id").value(1L));
 
-                verify(userService).updateUserProfile(eq(1L), any(UpdateProfileRequest.class));
+                verify(profileService).updateProfile(eq(1L), any(UpdateProfileRequest.class));
         }
 
         @Test
@@ -133,7 +135,7 @@ public class UserControllerTest {
                 );
 
                 // when & then
-                mockMvc.perform(put("/users")
+                mockMvc.perform(put("/profile")
                                 .with(user(currentUser))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -141,7 +143,7 @@ public class UserControllerTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.status").value(400));
 
-                verify(userService, never()).updateUserProfile(anyLong(), any(UpdateProfileRequest.class));
+                verify(profileService, never()).updateProfile(anyLong(), any(UpdateProfileRequest.class));
         }
 
         @Test
@@ -153,7 +155,7 @@ public class UserControllerTest {
                 );
 
                 // when & then
-                mockMvc.perform(put("/users")
+                mockMvc.perform(put("/profile")
                                 .with(user(currentUser))
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -161,7 +163,7 @@ public class UserControllerTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.status").value(400));    
 
-                verify(userService, never()).updateUserProfile(anyLong(), any(UpdateProfileRequest.class));
+                verify(profileService, never()).updateProfile(anyLong(), any(UpdateProfileRequest.class));
         }
 
           @Test
@@ -173,7 +175,7 @@ public class UserControllerTest {
             );
 
             // when & then
-            mockMvc.perform(put("/users")
+            mockMvc.perform(put("/profile")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -181,7 +183,7 @@ public class UserControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.birthDate").exists());
 
-            verify(userService, never()).updateUserProfile(any(), any());
+            verify(profileService, never()).updateProfile(any(), any());
         }
 
         @Test
@@ -191,11 +193,11 @@ public class UserControllerTest {
             UpdateProfileRequest request = new UpdateProfileRequest(
                 "Anna", "Nowak", null);
 
-            when(userService.updateUserProfile(eq(1L), any(UpdateProfileRequest.class)))
+            when(profileService.updateProfile(eq(1L), any(UpdateProfileRequest.class)))
                 .thenThrow(new UserNotFoundException(1L));
 
             // when & then
-            mockMvc.perform(put("/users")
+            mockMvc.perform(put("/profile")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -210,18 +212,18 @@ public class UserControllerTest {
             ChangePasswordRequest request = new ChangePasswordRequest(
                 "stareHaslo", "noweHaslo123", "noweHaslo123");
 
-            doNothing().when(userService)
+            doNothing().when(profileService)
                 .changePassword(eq(1L), any(ChangePasswordRequest.class));
 
             // when & then
-            mockMvc.perform(post("/users/change-password")
+            mockMvc.perform(post("/profile/change-password")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-            verify(userService).changePassword(eq(1L), any(ChangePasswordRequest.class));
+            verify(profileService).changePassword(eq(1L), any(ChangePasswordRequest.class));
         }
 
         @Test
@@ -232,7 +234,7 @@ public class UserControllerTest {
                 "", "noweHaslo123", "noweHaslo123");
 
             // when & then
-            mockMvc.perform(post("/users/change-password")
+            mockMvc.perform(post("/profile/change-password")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -240,7 +242,7 @@ public class UserControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.currentPassword").exists());
 
-            verify(userService, never()).changePassword(any(), any());
+            verify(profileService, never()).changePassword(any(), any());
         }
 
         @Test
@@ -251,7 +253,7 @@ public class UserControllerTest {
                 "stareHaslo", "abc", "abc");
 
             // when & then
-            mockMvc.perform(post("/users/change-password")
+            mockMvc.perform(post("/profile/change-password")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -259,7 +261,7 @@ public class UserControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.newPassword").exists());
 
-            verify(userService, never()).changePassword(any(), any());
+            verify(profileService, never()).changePassword(any(), any());
         }
 
         @Test
@@ -270,10 +272,10 @@ public class UserControllerTest {
                 "stareHaslo", "noweHaslo123", "inneHaslo123");
 
             doThrow(new IllegalArgumentException("Hasła nie są zgodne"))
-                .when(userService).changePassword(eq(1L), any());
+                .when(profileService).changePassword(eq(1L), any());
 
             // when & then
-            mockMvc.perform(post("/users/change-password")
+            mockMvc.perform(post("/profile/change-password")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -291,10 +293,10 @@ public class UserControllerTest {
 
             doThrow(new IllegalArgumentException(
                     "Nowe hasło musi różnić się od aktualnego"))
-                .when(userService).changePassword(eq(1L), any());
+                .when(profileService).changePassword(eq(1L), any());
 
             // when & then
-            mockMvc.perform(post("/users/change-password")
+            mockMvc.perform(post("/profile/change-password")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -312,10 +314,10 @@ public class UserControllerTest {
                 "stareHaslo", "noweHaslo123", "noweHaslo123");
 
             doThrow(new UserNotFoundException(1L))
-                .when(userService).changePassword(eq(1L), any());
+                .when(profileService).changePassword(eq(1L), any());
 
             // when & then
-            mockMvc.perform(post("/users/change-password")
+            mockMvc.perform(post("/profile/change-password")
                     .with(user(currentUser))
                     .with(csrf())
                     .contentType(MediaType.APPLICATION_JSON)

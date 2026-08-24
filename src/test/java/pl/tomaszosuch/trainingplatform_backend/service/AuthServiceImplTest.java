@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -91,7 +92,7 @@ public class AuthServiceImplTest {
                     .thenReturn(savedUser);
 
             when(userMapper.toResponse(any(User.class)))
-                    .thenReturn(new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", Role.USER));
+                    .thenReturn(new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER));
 
             // when
             UserResponse response = authService.register(validRequest);
@@ -182,7 +183,7 @@ public class AuthServiceImplTest {
             when(passwordEncoder.encode(anyString())).thenReturn("hash");
             when(userRepository.save(any(User.class))).thenReturn(savedUser);
             when(userMapper.toResponse(any(User.class)))
-                    .thenReturn(new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", Role.USER));
+                    .thenReturn(new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER));
 
             // when
             UserResponse response = authService.register(validRequest);
