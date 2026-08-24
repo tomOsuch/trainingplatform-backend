@@ -35,6 +35,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: tp_password
       JWT_SECRET: dev-secret-key-minimum-32-characters-long
       JWT_EXPIRATION: 86400000
+      ADMIN_EMAIL: admin@training.local
+      ADMIN_PASSWORD: admin12345
     depends_on:
       postgres:
         condition: service_healthy
