@@ -45,8 +45,11 @@ public class GlobalExceptionHandler {
             .body(new ErrorResponse(409, "Operacja narusza spójność danych"));
     }
 
-    @ExceptionHandler(EmailAlreadyRegisteredException.class)
-    public ResponseEntity<ErrorResponse> handleEmailAlreadyRegistered(EmailAlreadyRegisteredException ex) {
+    @ExceptionHandler({
+            EmailAlreadyRegisteredException.class,
+            InvitationAlreadyResolvedException.class
+    })
+    public ResponseEntity<ErrorResponse> handleConflict(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse(409, ex.getMessage()));
     }
