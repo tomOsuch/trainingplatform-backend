@@ -37,6 +37,8 @@ app:
     password: ${ADMIN_PASSWORD:}
     first-name: ${ADMIN_FIRST_NAME:Administrator}
     last-name: ${ADMIN_LAST_NAME:Systemu}
+  mail:
+    provider: ${MAIL_PROVIDER:log}
 
 springdoc:
   api-docs:
