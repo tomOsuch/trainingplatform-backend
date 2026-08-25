@@ -20,11 +20,13 @@ import lombok.extern.slf4j.Slf4j;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler({
-        UserNotFoundException.class,
-        TrainingPlanNotFoundException.class,
-        WorkoutCategoryNotFoundException.class,
-        WorkoutLogNotFoundException.class
+            UserNotFoundException.class,
+            TrainingPlanNotFoundException.class,
+            WorkoutCategoryNotFoundException.class,
+            WorkoutLogNotFoundException.class,
+            InvitationNotFoundException.class
     })
+
     public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(new ErrorResponse(404, ex.getMessage()));
@@ -41,6 +43,12 @@ public class GlobalExceptionHandler {
         log.warn("Naruszenie spójności danych: {}", ex.getMostSpecificCause().getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(new ErrorResponse(409, "Operacja narusza spójność danych"));
+    }
+
+    @ExceptionHandler(EmailAlreadyRegisteredException.class)
+    public ResponseEntity<ErrorResponse> handleEmailAlreadyRegistered(EmailAlreadyRegisteredException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse(409, ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
