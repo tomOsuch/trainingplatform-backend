@@ -56,6 +56,16 @@ services:
     networks:
       - trainingplatform_network
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: trainingplatform_mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - trainingplatform_network
+
 volumes:
   postgres_data:
 
