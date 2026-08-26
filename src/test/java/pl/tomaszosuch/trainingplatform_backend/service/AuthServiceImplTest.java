@@ -1,5 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.service;
 
+import static org.junit.Assert.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -12,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -26,12 +28,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.LoginRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.InvitationCheckResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
+import pl.tomaszosuch.trainingplatform_backend.entity.Invitation;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
+import pl.tomaszosuch.trainingplatform_backend.exception.EmailAlreadyRegisteredException;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidCredentialsException;
+import pl.tomaszosuch.trainingplatform_backend.exception.InvalidInvitationException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
+import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.InvitationTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtTokenProvider;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AuthServiceImpl;
 
@@ -51,11 +59,23 @@ public class AuthServiceImplTest {
     @Mock
     private UserMapper userMapper;
 
+    @Mock
+    private InvitationRepository invitationRepository;
+
+    @Mock
+    private InvitationTokenGenerator invitationTokenGenerator;
+
     @InjectMocks
     private AuthServiceImpl authService;
 
+    private static final String TOKEN = "jawny-token-zaproszenia";
+    private static final String TOKEN_HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
     private RegisterRequest validRequest;
     private User savedUser;
+    private Invitation invitation;
+    private User inviter;
+
 
     @BeforeEach
     void setUp() {
@@ -63,7 +83,8 @@ public class AuthServiceImplTest {
                 "Jan",
                 "Kowalski",
                 "jan.kowalski@example.com",
-                "password");
+                "password",
+                TOKEN);
 
         savedUser = User.builder()
                 .id(1L)
@@ -74,126 +95,235 @@ public class AuthServiceImplTest {
                 .role(Role.USER)
                 .isActive(true)
                 .build();
+
+        inviter = User.builder()
+                .id(99L)
+                .email("admin@example.com")
+                .firstName("Administrator")
+                .lastName("Systemu")
+                .role(Role.ADMIN)
+                .isActive(true)
+                .build();
+
+        invitation = Invitation.builder()
+                .id(5L)
+                .email("jan.kowalski@example.com")
+                .tokenHash(TOKEN_HASH)
+                .role(Role.USER)
+                .invitedBy(inviter)
+                .expiresAt(LocalDateTime.now().plusDays(7))
+                .build();
     }
 
     @Nested
     @DisplayName("register()")
     class RegisterTests {
 
+        private void stubValidInvitation() {
+            when(invitationTokenGenerator.hash(TOKEN)).thenReturn(TOKEN_HASH);
+            when(invitationRepository.findByTokenHash(TOKEN_HASH)).thenReturn(Optional.of(invitation));
+        }
+
         @Test
-        @DisplayName("powinien zarejestrować użytkownika gdy dane są poprawne")
-        void shouldRegisterUserWhenDataIsValid() {
-            // given
-            when(userRepository.existsByEmail(validRequest.email()))
-                    .thenReturn(false);
-            when(passwordEncoder.encode(validRequest.password()))
-                    .thenReturn("haslo_zahashowane");
-            when(userRepository.save(any(User.class)))
-                    .thenReturn(savedUser);
+        @DisplayName("rejestruje użytkownika na podstawie ważnego zaproszenia")
+        void shouldRegisterUserFromValidInvitation() {
+            stubValidInvitation();
+            when(userRepository.existsByEmail("jan.kowalski@example.com")).thenReturn(false);
+            when(passwordEncoder.encode("password")).thenReturn("haslo_zahashowane");
+            when(userRepository.save(any(User.class))).thenReturn(savedUser);
+            when(userMapper.toResponse(any(User.class))).thenReturn(
+                    new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski",
+                            LocalDate.of(1990, 5, 14), Role.USER));
 
-            when(userMapper.toResponse(any(User.class)))
-                    .thenReturn(new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER));
-
-            // when
             UserResponse response = authService.register(validRequest);
 
-            // then
             assertNotNull(response);
             assertEquals(1L, response.id());
             assertEquals("jan.kowalski@example.com", response.email());
-            assertEquals("Jan", response.firstName());
-            assertEquals("Kowalski", response.lastName());
-            assertEquals(Role.USER, response.role());
-
-            verify(userRepository).existsByEmail(validRequest.email());
-            verify(passwordEncoder).encode(validRequest.password());
             verify(userRepository).save(any(User.class));
         }
 
         @Test
-        @DisplayName("powinien zahashować hasło przed zapisem")
+        @DisplayName("nadaje rolę z zaproszenia, nie sztywne USER")
+        void shouldTakeRoleFromInvitation() {
+            invitation.setRole(Role.ADMIN);
+            stubValidInvitation();
+            when(userRepository.existsByEmail(anyString())).thenReturn(false);
+            when(passwordEncoder.encode(anyString())).thenReturn("hash");
+            when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+            authService.register(validRequest);
+
+            verify(userRepository).save(argThat(user -> user.getRole() == Role.ADMIN));
+        }
+
+        @Test
+        @DisplayName("zapisuje adres z zaproszenia, nie z ciała żądania")
+        void shouldUseEmailFromInvitationNotFromRequest() {
+            RegisterRequest differentCase = new RegisterRequest(
+                    "Jan", "Kowalski", "JAN.KOWALSKI@Example.com", "password", TOKEN);
+
+            stubValidInvitation();
+            when(userRepository.existsByEmail("jan.kowalski@example.com")).thenReturn(false);
+            when(passwordEncoder.encode(anyString())).thenReturn("hash");
+            when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+            authService.register(differentCase);
+
+            verify(userRepository).save(argThat(
+                    user -> user.getEmail().equals("jan.kowalski@example.com")));
+        }
+
+        @Test
+        @DisplayName("oznacza zaproszenie jako wykorzystane")
+        void shouldMarkInvitationAsUsed() {
+            stubValidInvitation();
+            when(userRepository.existsByEmail(anyString())).thenReturn(false);
+            when(passwordEncoder.encode(anyString())).thenReturn("hash");
+            when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+            authService.register(validRequest);
+
+            assertNotNull(invitation.getUsedAt());
+            verify(invitationRepository).save(invitation);
+        }
+
+        @Test
+        @DisplayName("hashuje hasło przed zapisem")
         void shouldHashPasswordBeforeSaving() {
-            // given
+            stubValidInvitation();
             when(userRepository.existsByEmail(anyString())).thenReturn(false);
             when(passwordEncoder.encode("password")).thenReturn("$2a$10$zahashowane");
             when(userRepository.save(any(User.class))).thenReturn(savedUser);
 
-            // when
             authService.register(validRequest);
 
-            // then
             verify(passwordEncoder).encode("password");
-            verify(userRepository).save(argThat(user -> user.getPassword().equals("$2a$10$zahashowane")));
+            verify(userRepository).save(argThat(
+                    user -> user.getPassword().equals("$2a$10$zahashowane")));
         }
 
         @Test
-        @DisplayName("powinien rzucić wyjątek gdy email jest już zajęty")
-        void shouldThrowExceptionWhenEmailAlreadyExists() {
-            // given
-            when(userRepository.existsByEmail(validRequest.email()))
-                    .thenReturn(true);
+        @DisplayName("odrzuca token, którego nie ma w bazie")
+        void shouldRejectUnknownToken() {
+            when(invitationTokenGenerator.hash(TOKEN)).thenReturn(TOKEN_HASH);
+            when(invitationRepository.findByTokenHash(TOKEN_HASH)).thenReturn(Optional.empty());
 
-            // when & then
-            IllegalArgumentException exception = assertThrows(
-                    IllegalArgumentException.class,
+            assertThrows(InvalidInvitationException.class,
                     () -> authService.register(validRequest));
-
-            assertTrue(exception.getMessage()
-                    .contains("jan.kowalski@example.com"));
 
             verify(userRepository, never()).save(any(User.class));
             verify(passwordEncoder, never()).encode(anyString());
         }
 
         @Test
-        @DisplayName("nie powinien zapisać użytkownika gdy email jest zajęty")
-        void shouldNotSaveUserWhenEmailIsTaken() {
-            // given
-            when(userRepository.existsByEmail(anyString())).thenReturn(true);
+        @DisplayName("odrzuca zaproszenie już wykorzystane")
+        void shouldRejectUsedInvitation() {
+            invitation.setUsedAt(LocalDateTime.now().minusHours(1));
+            stubValidInvitation();
 
-            // when
-            assertThrows(IllegalArgumentException.class,
+            InvalidInvitationException ex = assertThrows(InvalidInvitationException.class,
                     () -> authService.register(validRequest));
 
-            // then
-            verify(userRepository, never()).save(any());
+            assertTrue(ex.getMessage().contains("wykorzystane"));
+            verify(userRepository, never()).save(any(User.class));
         }
 
         @Test
-        @DisplayName("nowy użytkownik powinien mieć rolę USER i aktywne konto")
-        void shouldCreateUserWithDefaultRoleAndActiveAccount() {
-            // given
-            when(userRepository.existsByEmail(anyString())).thenReturn(false);
-            when(passwordEncoder.encode(anyString())).thenReturn("hash");
-            when(userRepository.save(any(User.class))).thenReturn(savedUser);
+        @DisplayName("odrzuca zaproszenie unieważnione")
+        void shouldRejectRevokedInvitation() {
+            invitation.setRevokedAt(LocalDateTime.now().minusMinutes(10));
+            stubValidInvitation();
 
-            // when
-            authService.register(validRequest);
+            InvalidInvitationException ex = assertThrows(InvalidInvitationException.class,
+                    () -> authService.register(validRequest));
 
-            // then
-            verify(userRepository).save(argThat(user -> user.getRole() == Role.USER &&
-                    Boolean.TRUE.equals(user.getIsActive())));
+            assertTrue(ex.getMessage().contains("unieważnione"));
+            verify(userRepository, never()).save(any(User.class));
         }
 
         @Test
-        @DisplayName("odpowiedź nie powinna zawierać hasła")
-        void responseShouldNotContainPassword() {
-            // given
-            when(userRepository.existsByEmail(anyString())).thenReturn(false);
-            when(passwordEncoder.encode(anyString())).thenReturn("hash");
-            when(userRepository.save(any(User.class))).thenReturn(savedUser);
-            when(userMapper.toResponse(any(User.class)))
-                    .thenReturn(new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER));
+        @DisplayName("odrzuca zaproszenie wygasłe")
+        void shouldRejectExpiredInvitation() {
+            invitation.setExpiresAt(LocalDateTime.now().minusDays(1));
+            stubValidInvitation();
 
-            // when
-            UserResponse response = authService.register(validRequest);
+            InvalidInvitationException ex = assertThrows(InvalidInvitationException.class,
+                    () -> authService.register(validRequest));
 
-            // then - record UserResponse nie ma pola password
-            assertNotNull(response.id());
-            assertNotNull(response.email());
-            assertNotNull(response.firstName());
-            assertNotNull(response.lastName());
-            assertNotNull(response.role());
+            assertTrue(ex.getMessage().contains("wygasło"));
+            verify(userRepository, never()).save(any(User.class));
+        }
+
+        @Test
+        @DisplayName("odrzuca rejestrację na adres inny niż z zaproszenia")
+        void shouldRejectEmailMismatch() {
+            RegisterRequest otherEmail = new RegisterRequest(
+                    "Jan", "Kowalski", "ktos.inny@example.com", "password", TOKEN);
+
+            stubValidInvitation();
+
+            InvalidInvitationException ex = assertThrows(InvalidInvitationException.class,
+                    () -> authService.register(otherEmail));
+
+            assertTrue(ex.getMessage().contains("inny adres"));
+            verify(userRepository, never()).save(any(User.class));
+        }
+
+        @Test
+        @DisplayName("zwraca 409 przez EmailAlreadyRegisteredException, gdy adres ma już konto")
+        void shouldThrowConflictWhenEmailAlreadyExists() {
+            stubValidInvitation();
+            when(userRepository.existsByEmail("jan.kowalski@example.com")).thenReturn(true);
+
+            EmailAlreadyRegisteredException ex = assertThrows(
+                    EmailAlreadyRegisteredException.class,
+                    () -> authService.register(validRequest));
+
+            assertTrue(ex.getMessage().contains("jan.kowalski@example.com"));
+            verify(userRepository, never()).save(any(User.class));
+            verify(passwordEncoder, never()).encode(anyString());
+        }
+
+        @Test
+        @DisplayName("nie oznacza zaproszenia jako wykorzystanego, gdy rejestracja się nie powiedzie")
+        void shouldNotConsumeInvitationOnFailure() {
+            stubValidInvitation();
+            when(userRepository.existsByEmail(anyString())).thenReturn(true);
+
+            assertThrows(EmailAlreadyRegisteredException.class,
+                    () -> authService.register(validRequest));
+
+            assertNull(invitation.getUsedAt());
+            verify(invitationRepository, never()).save(any(Invitation.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("checkInvitation()")
+    class CheckInvitationTests {
+
+        @Test
+        @DisplayName("zwraca adres i termin ważności dla ważnego zaproszenia")
+        void shouldReturnEmailAndExpiry() {
+            when(invitationTokenGenerator.hash(TOKEN)).thenReturn(TOKEN_HASH);
+            when(invitationRepository.findByTokenHash(TOKEN_HASH)).thenReturn(Optional.of(invitation));
+
+            InvitationCheckResponse result = authService.checkInvitation(TOKEN);
+
+            assertEquals("jan.kowalski@example.com", result.email());
+            assertEquals(invitation.getExpiresAt(), result.expiresAt());
+        }
+
+        @Test
+        @DisplayName("stosuje te same reguły co rejestracja — odrzuca wygasłe")
+        void shouldApplySameRulesAsRegistration() {
+            invitation.setExpiresAt(LocalDateTime.now().minusDays(1));
+            when(invitationTokenGenerator.hash(TOKEN)).thenReturn(TOKEN_HASH);
+            when(invitationRepository.findByTokenHash(TOKEN_HASH)).thenReturn(Optional.of(invitation));
+
+            assertThrows(InvalidInvitationException.class,
+                    () -> authService.checkInvitation(TOKEN));
         }
     }
 

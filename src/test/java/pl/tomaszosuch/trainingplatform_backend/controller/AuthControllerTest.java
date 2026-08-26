@@ -3,6 +3,7 @@ package pl.tomaszosuch.trainingplatform_backend.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -20,14 +21,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.LoginRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.InvitationCheckResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.LoginResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidCredentialsException;
+import pl.tomaszosuch.trainingplatform_backend.exception.InvalidInvitationException;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AuthServiceImpl;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @WebMvcTest(controllers = AuthController.class,
     excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(
@@ -62,7 +66,7 @@ public class AuthControllerTest {
 
     @BeforeEach
     void setUp() {
-        validRegister = new RegisterRequest("Jan", "Kowalski", "jan.kowalski@example.com", "password");
+        validRegister = new RegisterRequest("Jan", "Kowalski", "jan.kowalski@example.com", "password", "token-zaproszenia");
         validLogin = new LoginRequest("jan.kowalski@example.com", "password");
         userResponse = new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER);
         loginResponse = new LoginResponse("token", 1L, "jan.kowalski@example.com", Role.USER);
@@ -91,7 +95,7 @@ public class AuthControllerTest {
     @DisplayName("powinien zwrócić 400 gdy email ma niepoprawny format")
     public void shouldReturn400WhenEmailIsInvalid() throws Exception {
         // given
-        RegisterRequest invalidRequest = new RegisterRequest("Jan", "Kowalski", "invalid-email", "password");
+        RegisterRequest invalidRequest = new RegisterRequest("Jan", "Kowalski", "invalid-email", "password", "token-zaproszenia");
 
         // when & then
         mockMvc.perform(post("/auth/register")
@@ -108,7 +112,7 @@ public class AuthControllerTest {
     @DisplayName("powinien zwrócić 400 gdy hasło jest za krótkie")
     public void shouldReturn400WhenPasswordIsTooShort() throws Exception {
         // given
-        RegisterRequest invalidRequest = new RegisterRequest("Jan", "Kowalski", "jan.kowalski@example.com", "abc");
+        RegisterRequest invalidRequest = new RegisterRequest("Jan", "Kowalski", "jan.kowalski@example.com", "abc", "token-zaproszenia");
 
         // when & then
         mockMvc.perform(post("/auth/register")
@@ -194,6 +198,48 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.errors.email").exists());
 
         verify(authService, never()).login(any(LoginRequest.class));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy brakuje tokenu zaproszenia")
+    public void shouldReturn400WhenTokenIsMissing() throws Exception {
+        RegisterRequest withoutToken = new RegisterRequest(
+                "Jan", "Kowalski", "jan.kowalski@example.com", "password", "");
+
+        mockMvc.perform(post("/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(withoutToken)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.token").exists());
+
+        verify(authService, never()).register(any(RegisterRequest.class));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 200 z adresem z zaproszenia")
+    public void shouldReturn200WithInvitationEmail() throws Exception {
+        when(authService.checkInvitation("abc123")).thenReturn(
+                new InvitationCheckResponse("zapraszany@example.com",
+                        LocalDateTime.now().plusDays(7)));
+
+        mockMvc.perform(get("/auth/invitation").param("token", "abc123"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("zapraszany@example.com"))
+                .andExpect(jsonPath("$.expiresAt").exists())
+                .andExpect(jsonPath("$.role").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 400 dla nieważnego tokenu")
+    public void shouldReturn400ForInvalidToken() throws Exception {
+        when(authService.checkInvitation("zly-token"))
+                .thenThrow(new InvalidInvitationException("Zaproszenie wygasło"));
+
+        mockMvc.perform(get("/auth/invitation").param("token", "zly-token"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Zaproszenie wygasło"));
     }
 
 }

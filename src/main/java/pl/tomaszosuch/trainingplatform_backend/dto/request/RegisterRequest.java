@@ -17,7 +17,9 @@ public record RegisterRequest(
     String email,
     @NotBlank(message = "Hasło jest wymagane")
     @Size(min = 8, message = "Hasło musi mieć co najmniej 8 znaków")
-    String password
+    String password,
+    @NotBlank(message = "Token zaproszenia jest wymagany")
+    String token
 ) {
 
 }
