@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 
 import javax.crypto.SecretKey;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,17 @@ public class JwtTokenProvider {
 
     @Value("${jwt.expiration}")
     private long jwtExpiration;
+
+    @PostConstruct
+    void validateSecretStrength() {
+        int lengthInBytes = jwtSecret.getBytes(StandardCharsets.UTF_8).length;
+
+        if (lengthInBytes < 64) {
+            throw new IllegalStateException(
+                    "JWT_SECRET ma " + lengthInBytes + " bajtów, wymagane minimum 64. "
+                            + "Wygeneruj klucz poleceniem: openssl rand -base64 64 | tr -d '\\n'");
+        }
+    }
 
     public String generateToken(String email) {
         Date now = new Date();

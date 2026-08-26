@@ -1,0 +1,15 @@
+spring:
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    root: WARN
+    pl.tomaszosuch.trainingplatform_backend: INFO
+    org.springframework.security: WARN
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
