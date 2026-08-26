@@ -35,8 +35,8 @@ public class InvitationServiceImpl implements InvitationService {
     private final InvitationRepository invitationRepository;
     private final UserRepository userRepository;
     private final InvitationTokenGenerator tokenGenerator;
-    private InvitationMapper invitationMapper;
-    private EmailService emailService;
+    private final InvitationMapper invitationMapper;
+    private final EmailService emailService;
     private final InvitationProperties properties;
 
     @Override
