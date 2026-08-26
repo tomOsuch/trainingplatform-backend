@@ -4,13 +4,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.LoginRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.InvitationCheckResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.service.AuthService;
 
@@ -30,5 +28,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @GetMapping("/invitation")
+    public ResponseEntity<InvitationCheckResponse> checkInvitation(@RequestParam String token) {
+        return ResponseEntity.ok(authService.checkInvitation(token));
     }
 }

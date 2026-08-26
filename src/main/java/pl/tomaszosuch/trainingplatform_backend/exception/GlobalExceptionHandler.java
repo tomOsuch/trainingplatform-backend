@@ -32,8 +32,11 @@ public class GlobalExceptionHandler {
             .body(new ErrorResponse(404, ex.getMessage()));
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleBadRequest(IllegalArgumentException ex) {
+    @ExceptionHandler({
+            IllegalArgumentException.class,
+            InvalidInvitationException.class
+    })
+    public ResponseEntity<ErrorResponse> handleBadRequest(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(new ErrorResponse(400, ex.getMessage()));
     }
