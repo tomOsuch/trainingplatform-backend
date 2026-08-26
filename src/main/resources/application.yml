@@ -37,6 +37,11 @@ app:
     password: ${ADMIN_PASSWORD:}
     first-name: ${ADMIN_FIRST_NAME:Administrator}
     last-name: ${ADMIN_LAST_NAME:Systemu}
+  mail:
+    provider: ${MAIL_PROVIDER:log}
+  invitation:
+    expiration-days: ${INVITATION_EXPIRATION_DAYS:7}
+    accept-base-url: ${INVITATION_ACCEPT_BASE_URL:http://localhost:5173/register}
 
 springdoc:
   api-docs:
