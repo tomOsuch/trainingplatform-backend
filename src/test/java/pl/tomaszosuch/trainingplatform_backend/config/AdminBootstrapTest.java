@@ -51,6 +51,8 @@ public class AdminBootstrapTest {
         properties = new AdminBootstrapProperties();
         properties.setEmail(ADMIN_EMAIL);
         properties.setPassword(ADMIN_PASSWORD);
+        properties.setFirstName("Administrator");
+        properties.setLastName("Systemu");
 
         adminBootstrap = new AdminBootstrap(userRepository, passwordEncoder, properties);
     }

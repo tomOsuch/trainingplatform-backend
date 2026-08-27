@@ -22,7 +22,7 @@ import pl.tomaszosuch.trainingplatform_backend.exception.InvitationNotFoundExcep
 import pl.tomaszosuch.trainingplatform_backend.mapper.InvitationMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
-import pl.tomaszosuch.trainingplatform_backend.security.InvitationTokenGenerator;
+import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.InvitationServiceImpl;
 
 import java.time.LocalDateTime;
@@ -49,7 +49,7 @@ public class InvitationServiceImplTest {
     private UserRepository userRepository;
 
     @Mock
-    private InvitationTokenGenerator tokenGenerator;
+    private SecureTokenGenerator tokenGenerator;
 
     @Mock
     private InvitationMapper invitationMapper;

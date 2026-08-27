@@ -1,14 +1,21 @@
 package pl.tomaszosuch.trainingplatform_backend.config;
 
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
+
+import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Getter
 @Setter
+@Validated
 @ConfigurationProperties(prefix = "app.mail")
 public class MailProperties {
 
-    private String provider = "log";
-    private String from = "zaproszenia@trainingplatform.local";
+    @NotBlank
+    private String provider;
+
+    @NotBlank
+    private String from;
 }

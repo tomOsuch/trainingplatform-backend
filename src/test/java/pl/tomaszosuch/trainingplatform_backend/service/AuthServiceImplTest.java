@@ -39,7 +39,7 @@ import pl.tomaszosuch.trainingplatform_backend.exception.InvalidInvitationExcept
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
-import pl.tomaszosuch.trainingplatform_backend.security.InvitationTokenGenerator;
+import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtTokenProvider;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AuthServiceImpl;
 
@@ -63,7 +63,7 @@ public class AuthServiceImplTest {
     private InvitationRepository invitationRepository;
 
     @Mock
-    private InvitationTokenGenerator invitationTokenGenerator;
+    private SecureTokenGenerator invitationTokenGenerator;
 
     @InjectMocks
     private AuthServiceImpl authService;

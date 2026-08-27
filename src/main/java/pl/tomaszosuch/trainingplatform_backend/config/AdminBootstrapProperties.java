@@ -1,8 +1,9 @@
 package pl.tomaszosuch.trainingplatform_backend.config;
 
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Getter
 @Setter
@@ -11,6 +12,6 @@ public class AdminBootstrapProperties {
 
     private String email;
     private String password;
-    private String firstName = "Administrator";
-    private String lastName = "Systemu";
+    private String firstName;
+    private String lastName;
 }

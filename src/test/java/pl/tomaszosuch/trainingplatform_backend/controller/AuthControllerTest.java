@@ -20,14 +20,19 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.LoginRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.PasswordResetConfirmRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.PasswordResetRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.InvitationCheckResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.LoginResponse;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.PasswordResetCheckResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidCredentialsException;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidInvitationException;
+import pl.tomaszosuch.trainingplatform_backend.exception.InvalidPasswordResetTokenException;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
+import pl.tomaszosuch.trainingplatform_backend.service.PasswordResetService;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AuthServiceImpl;
 
 import java.time.LocalDate;
@@ -50,6 +55,9 @@ public class AuthControllerTest {
 
     @MockitoBean
     private AuthServiceImpl authService;
+
+    @MockitoBean
+    private PasswordResetService passwordResetService;
 
     @org.springframework.boot.test.context.TestConfiguration
     static class TestConfig {
@@ -240,6 +248,85 @@ public class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("Zaproszenie wygasło"));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 202 przy żądaniu resetu hasła")
+    public void shouldReturn202WhenPasswordResetRequested() throws Exception {
+        mockMvc.perform(post("/auth/password-reset")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new PasswordResetRequest("jan.kowalski@example.com"))))
+                .andExpect(status().isAccepted());
+
+        verify(passwordResetService).requestReset(any(PasswordResetRequest.class));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy adres w żądaniu resetu jest niepoprawny")
+    public void shouldReturn400WhenResetEmailIsInvalid() throws Exception {
+        mockMvc.perform(post("/auth/password-reset")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new PasswordResetRequest("to-nie-email"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.email").exists());
+
+        verify(passwordResetService, never()).requestReset(any(PasswordResetRequest.class));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 200 z adresem powiązanym z tokenem resetu")
+    public void shouldReturn200WithResetTokenOwner() throws Exception {
+        when(passwordResetService.checkToken("abc123")).thenReturn(
+                new PasswordResetCheckResponse("jan.kowalski@example.com",
+                        LocalDateTime.now().plusMinutes(60)));
+
+        mockMvc.perform(get("/auth/password-reset").param("token", "abc123"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("jan.kowalski@example.com"))
+                .andExpect(jsonPath("$.expiresAt").exists());
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 400 dla nieważnego tokenu resetu")
+    public void shouldReturn400ForInvalidResetToken() throws Exception {
+        when(passwordResetService.checkToken("zly-token"))
+                .thenThrow(new InvalidPasswordResetTokenException("Link do resetu hasła wygasł"));
+
+        mockMvc.perform(get("/auth/password-reset").param("token", "zly-token"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Link do resetu hasła wygasł"));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 204 po ustawieniu nowego hasła")
+    public void shouldReturn204WhenPasswordChanged() throws Exception {
+        mockMvc.perform(post("/auth/password-reset/confirm")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new PasswordResetConfirmRequest("abc123", "NoweHaslo123"))))
+                .andExpect(status().isNoContent());
+
+        verify(passwordResetService).confirmReset(any(PasswordResetConfirmRequest.class));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy nowe hasło jest za krótkie")
+    public void shouldReturn400WhenNewPasswordIsTooShort() throws Exception {
+        mockMvc.perform(post("/auth/password-reset/confirm")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new PasswordResetConfirmRequest("abc123", "abc"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.password").exists());
+
+        verify(passwordResetService, never()).confirmReset(any(PasswordResetConfirmRequest.class));
     }
 
 }

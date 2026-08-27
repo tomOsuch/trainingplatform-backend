@@ -10,7 +10,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 
 @Component
-public class InvitationTokenGenerator {
+public class SecureTokenGenerator {
 
     private static final int TOKEN_BYTES = 32;
 

@@ -11,12 +11,12 @@ import lombok.Setter;
 @Getter
 @Setter
 @Validated
-@ConfigurationProperties(prefix = "app.invitation")
-public class InvitationProperties {
+@ConfigurationProperties(prefix = "app.password-reset")
+public class PasswordResetProperties {
 
     @Positive
-    private int expirationDays;
+    private int expirationMinutes;
 
     @NotBlank
-    private String acceptBaseUrl;
+    private String resetBaseUrl;
 }

@@ -29,4 +29,21 @@ public class LoggingEmailService implements EmailService {
                 """,
                 recipientEmail, invitationUrl, EXPIRY_FORMAT.format(expiresAt));
     }
+
+    @Override
+    public void sendPasswordReset(String recipientEmail, String resetUrl, LocalDateTime expiresAt) {
+        logMail("RESET HASŁA", recipientEmail, resetUrl, expiresAt);
+    }
+
+    private void logMail(String kind, String recipient, String url, LocalDateTime expiresAt) {
+        log.info("""
+
+                ─────────── {} — tryb lokalny, mail NIE został wysłany ───────────
+                  Do:        {}
+                  Link:      {}
+                  Ważne do:  {}
+                ──────────────────────────────────────────────────────────────────
+                """,
+                kind, recipient, url, EXPIRY_FORMAT.format(expiresAt));
+    }
 }

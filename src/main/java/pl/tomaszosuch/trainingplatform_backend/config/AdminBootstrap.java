@@ -1,7 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.config;
 
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +15,6 @@ import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@EnableConfigurationProperties(AdminBootstrapProperties.class)
 public class AdminBootstrap implements CommandLineRunner {
 
     private final UserRepository userRepository;
