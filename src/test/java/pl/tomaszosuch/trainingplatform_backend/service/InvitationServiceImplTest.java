@@ -40,7 +40,7 @@ public class InvitationServiceImplTest {
     private static final String EMAIL = "nowy@example.com";
     private static final String PLAIN_TOKEN = "abc123-XYZ_jawnyToken";
     private static final String TOKEN_HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    private static final String ACCEPT_BASE_URL = "http://localhost:5173/register";
+    private static final String ACCEPT_BASE_URL = "http://localhost:3000/register";
 
     @Mock
     private InvitationRepository invitationRepository;

@@ -56,10 +56,10 @@ app:
     from: ${MAIL_FROM:zaproszenia@trainingplatform.local}
   invitation:
     expiration-days: ${INVITATION_EXPIRATION_DAYS:7}
-    accept-base-url: ${INVITATION_ACCEPT_BASE_URL:http://localhost:5173/register}
+    accept-base-url: ${INVITATION_ACCEPT_BASE_URL:http://localhost:3000/register}
   password-reset:
     expiration-minutes: ${PASSWORD_RESET_EXPIRATION_MINUTES:60}
-    reset-base-url: ${PASSWORD_RESET_BASE_URL:http://localhost:5173/reset-password}
+    reset-base-url: ${PASSWORD_RESET_BASE_URL:http://localhost:3000/reset-password}
 
 springdoc:
   api-docs:

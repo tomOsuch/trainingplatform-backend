@@ -22,7 +22,7 @@ app:
     from: testy@trainingplatform.local
   invitation:
     expiration-days: 7
-    accept-base-url: http://localhost:5173/register
+    accept-base-url: http://localhost:3000/register
   password-reset:
     expiration-minutes: 60
-    reset-base-url: http://localhost:5173/reset-password
+    reset-base-url: http://localhost:3000/reset-password

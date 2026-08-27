@@ -39,7 +39,7 @@ public class PasswordResetServiceImplTest {
     private static final String PLAIN_TOKEN = "jawny-token-resetu_ABC123";
     private static final String TOKEN_HASH =
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    private static final String RESET_BASE_URL = "http://localhost:5173/reset-password";
+    private static final String RESET_BASE_URL = "http://localhost:3000/reset-password";
 
     @Mock
     private PasswordResetTokenRepository tokenRepository;
