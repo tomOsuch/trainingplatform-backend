@@ -368,13 +368,13 @@ public class InvitationServiceImplTest {
                     .expiresAt(LocalDateTime.now().plusDays(5))
                     .build();
 
-            when(invitationRepository.findAllWithInvited()).thenReturn(List.of(invitation));
+            when(invitationRepository.findAllWithInviter()).thenReturn(List.of(invitation));
             when(invitationMapper.toResponse(invitation)).thenReturn(response);
 
             List<InvitationResponse> result = invitationService.findAllInvitations();
 
             assertEquals(1, result.size());
-            verify(invitationRepository).findAllWithInvited();
+            verify(invitationRepository).findAllWithInviter();
         }
     }
 }

@@ -69,7 +69,7 @@ public class InvitationServiceImpl implements InvitationService {
     @Override
     @Transactional(readOnly = true)
     public List<InvitationResponse> findAllInvitations() {
-        return invitationRepository.findAllWithInvited().stream()
+        return invitationRepository.findAllWithInviter().stream()
                 .map(invitationMapper::toResponse)
                 .toList();
     }

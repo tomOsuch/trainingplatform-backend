@@ -30,8 +30,8 @@ public class Invitation {
     @Column(nullable = false, length = 20)
     private Role role;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "invited_by", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "invited_by")
     private User invitedBy;
 
     @Column(name = "expires_at", nullable = false)

@@ -35,7 +35,7 @@ Aplikacja zastępuje prowadzenie dziennika treningowego w formie papierowej lub 
 - **Planowanie treningów** w kalendarzu z podziałem na kategorie
 - **Rejestrowanie wykonanych sesji** wraz z czasem trwania, intensywnością i notatkami
 - **Śledzenie postępów** i analizę aktywności
-- **Zarządzanie profilem** użytkownika
+- **Zarządzanie profilem** użytkownika, z możliwością usunięcia konta wraz z danymi
 
 Aplikacja jest **zamknięta** — konto można założyć wyłącznie na podstawie zaproszenia wystawionego przez administratora.
 
@@ -52,6 +52,7 @@ Projekt realizowany w architekturze warstwowej z naciskiem na czysty, testowalny
 - **Flyway** — wersjonowane migracje schematu bazy
 - **JWT** (jjwt 0.12.5) — autoryzacja bezstanowa
 - **MapStruct 1.6.3** — mapowanie encji na DTO
+- **Thymeleaf** — szablony wiadomości e-mail
 - **Lombok** — redukcja boilerplate
 - **springdoc-openapi 3.x** — dokumentacja Swagger/OpenAPI
 
@@ -68,8 +69,6 @@ Projekt realizowany w architekturze warstwowej z naciskiem na czysty, testowalny
 
 ## 🏗 Architektura
 
-Projekt korzysta z klasycznej architektury warstwowej:
-
 ```
 Controller  →  Service (interfejs + impl)  →  Repository  →  Baza danych
                       ↓
@@ -83,45 +82,43 @@ Controller  →  Service (interfejs + impl)  →  Repository  →  Baza danych
 - **Separacja interfejs + implementacja** dla serwisów (`AuthService` + `AuthServiceImpl`)
 - **DTO jako Java records** — niezmienne obiekty transferu danych
 - **MapStruct** — automatyczne mapowanie encji na DTO w czasie kompilacji
-- **Dedykowane wyjątki** per encja (`UserNotFoundException`, `InvitationNotFoundException`)
-- **Globalna obsługa błędów** przez `@RestControllerAdvice`
-- **Walidacja własności zasobów** — użytkownik operuje wyłącznie na swoich danych (403 przy próbie dostępu do cudzych)
+- **Dedykowane wyjątki** per encja, mapowane w `@RestControllerAdvice`
+- **Walidacja własności zasobów** — użytkownik operuje wyłącznie na swoich danych
 - **Autoryzacja oparta na rolach** (`USER`, `ADMIN`) z `@PreAuthorize`
 - **Transakcyjność na poziomie serwisu** — `@Transactional` na klasach implementacji, `open-in-view: false`
-- **Wymienne implementacje** wybierane właściwością — `EmailService` ma wariant logujący i SMTP-owy
+- **Wymienne implementacje wybierane właściwością** — `EmailService` ma wariant logujący i SMTP-owy
+- **Konfiguracja przez `@ConfigurationProperties` z walidacją** — brakująca wartość zatrzymuje start aplikacji zamiast po cichu podstawiać wartość domyślną
 
 ### Struktura pakietów
 
 ```
 pl.tomaszosuch.trainingplatform_backend
-├── config          # Konfiguracja (Security, OpenAPI, DataInitializer, AdminBootstrap, *Properties)
+├── config          # Security, OpenAPI, DataInitializer, AdminBootstrap, klasy *Properties
 ├── controller      # Kontrolery REST
 ├── dto
 │   ├── request     # DTO żądań (z walidacją)
 │   └── response    # DTO odpowiedzi
 ├── entity          # Encje JPA
-├── enums           # Enumy (Role, PlanStatus, InvitationStatus)
+├── enums           # Role, PlanStatus, InvitationStatus
 ├── exception       # Wyjątki + GlobalExceptionHandler
 ├── mapper          # Mappery MapStruct
 ├── repository      # Repozytoria Spring Data JPA
-├── security        # JWT (Provider, Filter, UserDetailsService), generator tokenów zaproszeń
+├── security        # JWT, SecureTokenGenerator
 └── service         # Logika biznesowa (interfejsy + impl/)
 ```
 
-Migracje bazy znajdują się w `src/main/resources/db/migration/`, skrypty pomocnicze w `scripts/`.
+Migracje w `src/main/resources/db/migration/`, szablony maili w `templates/mail/`, skrypty pomocnicze w `scripts/`.
 
 ---
 
 ## ✅ Wymagania
 
-- **Docker** i **Docker Compose** — uruchamiają całe środowisko
-- **openssl** — do wygenerowania klucza JWT (jest w każdym systemie uniksowym)
+- **Docker** i **Docker Compose**
+- **openssl** — do wygenerowania klucza JWT
 
-Do uruchomienia bez Dockera dodatkowo:
+Do uruchomienia bez Dockera dodatkowo: **Java 25**, **Maven 3.9+**, **PostgreSQL 15**.
 
-- **Java 25**, **Maven 3.9+**, **PostgreSQL 15**
-
-> Docker jest wymagany również do uruchomienia pełnego zestawu testów — test kontekstu aplikacji startuje bazę w kontenerze (Testcontainers).
+> Docker jest wymagany również do uruchomienia pełnego zestawu testów — test kontekstu startuje bazę w kontenerze (Testcontainers).
 
 ---
 
@@ -135,51 +132,54 @@ cd trainingplatform-backend
 docker compose up -d --build
 ```
 
-Skrypt tworzy plik `.env` na podstawie `.env.example` i **generuje sekrety** — klucz JWT (64 losowe bajty) oraz hasła. Wypisze na końcu hasło administratora; **zapisz je**, bo na nim powstanie konto przy pierwszym starcie.
+Skrypt tworzy `.env` na podstawie `.env.example` i **generuje sekrety** — klucz JWT (64 losowe bajty) oraz hasła. Wypisze hasło administratora; **zapisz je**, bo na nim powstanie konto przy pierwszym starcie.
 
 Skrypt nie nadpisze istniejącego `.env`. Aby wygenerować od nowa: `rm .env && ./scripts/setup-env.sh`.
 
-### Lokalnie bez Dockera
+Dostępne po starcie:
 
-Ustaw zmienne środowiskowe z `.env.example` (co najmniej `JWT_SECRET` i `SPRING_DATASOURCE_PASSWORD`), uruchom PostgreSQL, a potem:
+| Adres | Co to |
+|---|---|
+| `http://localhost:8080/api` | API |
+| `http://localhost:8080/api/swagger-ui.html` | Swagger UI (wyłączony w profilu `prod`) |
+| `http://localhost:8025` | **Mailpit** — skrzynka przechwytująca maile |
+| `http://localhost:5050` | pgAdmin |
 
-```bash
-./mvnw spring-boot:run
-```
-
-> Przy pierwszym uruchomieniu Flyway tworzy schemat bazy, `DataInitializer` dodaje 3 domyślne kategorie (**Taniec**, **Gimnastyka**, **Ogólnorozwojowy**), a `AdminBootstrap` zakłada konto administratora.
+> Przy pierwszym uruchomieniu Flyway tworzy schemat, `DataInitializer` dodaje 3 domyślne kategorie (**Taniec**, **Gimnastyka**, **Ogólnorozwojowy**), a `AdminBootstrap` zakłada konto administratora.
 
 ---
 
 ## 🔐 Konfiguracja i sekrety
 
-**W repozytorium nie ma żadnych haseł ani kluczy.** Cała konfiguracja wrażliwa pochodzi ze zmiennych środowiskowych wczytywanych z pliku `.env`, który jest w `.gitignore`.
+**W repozytorium nie ma żadnych haseł ani kluczy.** Cała konfiguracja wrażliwa pochodzi ze zmiennych środowiskowych wczytywanych z `.env`, który jest w `.gitignore`.
 
 `docker-compose.yml` korzysta z `.env` na dwa sposoby, które łatwo pomylić:
 
 - **podstawienie w treści pliku** (`${DB_NAME}`) — robi je Docker Compose przed startem, czytając `.env` automatycznie
-- **`env_file: .env`** — wstrzykuje wszystkie zmienne do wnętrza kontenera; dzięki temu `JWT_SECRET`, `ADMIN_*`, `MAIL_*` docierają do aplikacji, mimo że nie ma ich w bloku `environment`
+- **`env_file: .env`** — wstrzykuje zmienne do wnętrza kontenera; dzięki temu `JWT_SECRET`, `ADMIN_*`, `MAIL_*` docierają do aplikacji, mimo że nie ma ich w bloku `environment`
 
 ### Kluczowe zmienne
 
 | Zmienna | Znaczenie |
 |---|---|
-| `JWT_SECRET` | Klucz podpisujący tokeny. **Wymagany** — brak zatrzymuje start aplikacji. Minimum 64 bajty |
-| `JWT_EXPIRATION` | Czas życia tokenu w milisekundach (domyślnie 24 h) |
+| `JWT_SECRET` | Klucz podpisujący tokeny. **Wymagany** — brak zatrzymuje start. Minimum 64 bajty |
+| `JWT_EXPIRATION` | Czas życia tokenu w ms (domyślnie 24 h) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Konto administratora zakładane przy pierwszym starcie |
 | `MAIL_PROVIDER` | `log` (treść do konsoli) albo `smtp` (realna wysyłka) |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_FROM` | Konfiguracja SMTP |
-| `INVITATION_EXPIRATION_DAYS` | Ważność zaproszenia w dniach (domyślnie 7) |
-| `INVITATION_ACCEPT_BASE_URL` | Adres strony rejestracji frontendu — do niego dokleja się `?token=…` |
+| `INVITATION_EXPIRATION_DAYS` | Ważność zaproszenia (domyślnie 7 dni) |
+| `INVITATION_ACCEPT_BASE_URL` | Adres strony rejestracji frontendu — dokleja się `?token=…` |
+| `PASSWORD_RESET_EXPIRATION_MINUTES` | Ważność linku resetu (domyślnie 60 minut) |
+| `PASSWORD_RESET_BASE_URL` | Adres strony resetu hasła |
 | `SPRING_PROFILES_ACTIVE` | `dev` (logi DEBUG, Swagger) albo `prod` (logi WARN, Swagger wyłączony) |
-
-Klucz JWT generuje się poleceniem:
 
 ```bash
 openssl rand -base64 64 | tr -d '\n'
 ```
 
-Podmiana klucza unieważnia wszystkie wydane tokeny — użytkownicy muszą zalogować się ponownie.
+Podmiana klucza JWT unieważnia wszystkie wydane tokeny — użytkownicy muszą zalogować się ponownie.
+
+**Klasy `*Properties` są walidowane** (`@Validated`): brak `INVITATION_ACCEPT_BASE_URL` albo `expirationMinutes = 0` zatrzyma start aplikacji z komunikatem wskazującym właściwość. Głośna awaria przy starcie jest zawsze lepsza od cichej awarii w działaniu.
 
 ---
 
@@ -208,7 +208,7 @@ Administrator                 Zapraszany
 
 ### Pierwszy administrator
 
-Rejestracja zawsze nadaje rolę z zaproszenia, a zaproszenia wystawia tylko administrator — więc pierwszy musi powstać poza tym obiegiem. Robi to `AdminBootstrap` przy starcie aplikacji:
+Rejestracja nadaje rolę z zaproszenia, a zaproszenia wystawia tylko administrator — więc pierwszy musi powstać poza tym obiegiem. Robi to `AdminBootstrap` przy starcie:
 
 1. jeśli w bazie jest **jakiekolwiek** konto z rolą `ADMIN` — nic się nie dzieje
 2. jeśli nie ma, a brakuje `ADMIN_EMAIL` / `ADMIN_PASSWORD` — ostrzeżenie w logu, start bez seedu
@@ -223,50 +223,61 @@ Warunkiem jest brak jakiegokolwiek administratora, nie brak konkretnego adresu. 
 - Jeden adres może mieć tylko jedno **oczekujące** zaproszenie; wystawienie nowego unieważnia poprzednie
 - Nie można zaprosić adresu, który ma już konto (`409`)
 - Rola nowego konta pochodzi **z rekordu zaproszenia**, nigdy z ciała żądania rejestracji
-- Rejestracja zapisuje adres z zaproszenia, a pole `email` w żądaniu służy tylko do potwierdzenia
+- Rejestracja zapisuje adres z zaproszenia; pole `email` w żądaniu służy tylko do potwierdzenia
 - Zaproszenie jest jednorazowe — po rejestracji token jest spalony
+
+### Reset hasła
+
+Ten sam mechanizm tokenów, z krótszym terminem: **60 minut** zamiast 7 dni. Reset robi się od razu, a długi termin to niepotrzebnie szerokie okno dla kogoś, kto przejmie skrzynkę.
+
+`POST /auth/password-reset` zwraca **`202` niezależnie od tego, czy konto istnieje**. Gdyby nieznany adres dawał `404`, formularz „zapomniałem hasła" stałby się narzędziem do sprawdzania, kto ma konto w systemie.
+
+⚠️ **Znane ograniczenie:** tokeny JWT wydane przed resetem pozostają ważne do wygaśnięcia. Zmiana hasła nie kończy istniejących sesji — wymaga to wersjonowania tokenów i należy do zakresu A5.
+
+### Usunięcie konta
+
+`DELETE /profile` z potwierdzeniem hasłem. Usuwa konto wraz z planami, wpisami dziennika i tokenami resetu — kaskadą na poziomie bazy.
+
+Dwie reguły:
+
+- **Ostatniego administratora nie da się usunąć** (`403`). Gdyby jedyny admin skasował konto, nikt już nikogo nie zaprosi i aplikacja zamyka się na głucho
+- **Zaproszenia przeżywają usunięcie swojego autora.** `invitation.invited_by` przechodzi na `NULL`, bo rekord dokumentuje, jak do systemu trafił ktoś inny — to nie są dane usuwanego użytkownika. Jego **niezużyte** zaproszenia są przy okazji unieważniane
+
+Błędne hasło daje **`400`, nie `401`** — użytkownik jest zalogowany, a token ważny; `401` skłoniłoby przechwytywacz na froncie do wylogowania go za literówkę.
 
 ### Wysyłka maili
 
-Tryb wybiera właściwość `app.mail.provider`:
-
-| Wartość | Zachowanie |
+| `app.mail.provider` | Zachowanie |
 |---|---|
-| `log` (domyślnie) | Treść wiadomości trafia do logu aplikacji w obramowanym bloku. Nic nie wychodzi na zewnątrz — bezpieczne dla testów i CI |
-| `smtp` | Realna wysyłka. Lokalnie do **Mailpita** (`http://localhost:8025`), gdzie widzisz maila tak, jak zobaczy go użytkownik |
+| `log` (domyślnie) | Treść trafia do logu aplikacji w obramowanym bloku. Nic nie wychodzi na zewnątrz — bezpieczne dla testów i CI |
+| `smtp` | Realna wysyłka. Lokalnie do **Mailpita** (`http://localhost:8025`) |
 
 Mailpit jest częścią `docker-compose.yml`, przyjmuje pocztę na porcie 1025 i **niczego nie przekazuje dalej**. Przejście na dostawcę produkcyjnego to zmiana zmiennych `MAIL_*`, bez zmian w kodzie.
 
-Niepowodzenie wysyłki **nie wywraca zaproszenia** — rekord zostaje zapisany z pustym `sent_at`, a błąd trafia do logu. Puste `sentAt` przy statusie `PENDING` oznacza „zaproszenie istnieje, mail nie poszedł".
+Niepowodzenie wysyłki **nie wywraca operacji** — zaproszenie zostaje zapisane z pustym `sent_at`, a błąd trafia do logu.
 
 ---
 
 ## 🗃 Migracje bazy danych
 
-Schemat bazy jest wersjonowany przez **Flyway**. Hibernate pracuje w trybie `ddl-auto: validate` — **nie tworzy ani nie zmienia tabel**, tylko sprawdza przy starcie, czy encje zgadzają się z bazą. Każda zmiana w encji wymaga migracji, inaczej aplikacja nie wstanie.
+Schemat jest wersjonowany przez **Flyway**. Hibernate pracuje w trybie `ddl-auto: validate` — **nie tworzy ani nie zmienia tabel**, tylko sprawdza przy starcie zgodność encji ze schematem.
 
 ```
 src/main/resources/db/migration/
 ├── V1__baseline.sql                               # snapshot schematu po Fazie 1
 ├── V2__composite_indexes_and_birth_date_type.sql  # indeksy złożone + birth_date → DATE
-└── V3__invitations.sql                            # tabela invitation
+├── V3__invitations.sql                            # tabela invitation
+├── V4__password_reset_tokens.sql                  # tabela password_reset_token
+└── V5__account_deletion_cascades.sql              # ON DELETE CASCADE / SET NULL
 ```
 
 ### Jak dodać nową migrację
 
-1. Utwórz plik `V<numer>__krotki_opis.sql` w `src/main/resources/db/migration/`
-2. Numer musi być większy od ostatniego; po podwójnym podkreśleniu opis w `snake_case`
+1. Utwórz plik `V<numer>__krotki_opis.sql`
+2. Numer większy od ostatniego; opis w `snake_case` po podwójnym podkreśleniu
 3. Uruchom aplikację — Flyway wykona migrację i dopisze wpis do `flyway_schema_history`
 
-> **Plików już zastosowanych się nie edytuje.** Flyway trzyma sumę kontrolną każdej migracji i przerwie start aplikacji, gdy zawartość zmieni się po wykonaniu. Poprawki wprowadza się zawsze kolejną migracją.
-
-### Konfiguracja
-
-| Ustawienie | Wartość | Znaczenie |
-|------------|---------|-----------|
-| `spring.flyway.baseline-on-migrate` | `true` | Baza sprzed wdrożenia Flyway dostaje wpis BASELINE zamiast wykonywać `V1` |
-| `spring.flyway.baseline-version` | `1` | `V1` jest punktem wyjścia |
-| `spring.jpa.hibernate.ddl-auto` | `validate` | Hibernate tylko weryfikuje zgodność encji ze schematem |
+> **Plików już zastosowanych się nie edytuje** — nawet formatowania. Flyway trzyma sumę kontrolną i przerwie start przy niezgodności. Poprawki wprowadza się kolejną migracją.
 
 ```sql
 SELECT version, description, success, execution_time
@@ -280,12 +291,9 @@ ORDER BY installed_rank;
 
 Swagger UI: `http://localhost:8080/api/swagger-ui.html` *(wyłączony w profilu `prod`)*
 
-### Jak autoryzować żądania
+Dołączona jest kolekcja **Postman** (`trainingplatform.postman_collection.json`) — 13 folderów, 103 requesty, 216 asercji. Przechodzi pełne przepływy: zaproszenie → rejestracja → reset hasła → usunięcie konta.
 
-1. Zaloguj się przez `POST /auth/login` — otrzymasz token JWT
-2. W Swagger UI kliknij **Authorize** i wklej token
-
-Dołączona jest również kolekcja **Postman** (`trainingplatform.postman_collection.json`) — 11 folderów, 84 requesty, 184 asercje. Kolekcja loguje się jako administrator, wystawia zaproszenia i **odczytuje tokeny ze skrzynki Mailpita**, więc wymaga `MAIL_PROVIDER=smtp` i uruchomionego środowiska Dockerowego.
+⚠️ Kolekcja **odczytuje tokeny z maili przez API Mailpita**, bo token jawny nie wraca z backendu. Wymaga `MAIL_PROVIDER=smtp` i uruchomionego środowiska. Folder **12 usuwa konto testowe**, więc uruchamiaj całość od folderu `0. Setup`.
 
 ---
 
@@ -298,19 +306,23 @@ Dołączona jest również kolekcja **Postman** (`trainingplatform.postman_colle
 | `POST` | `/auth/register` | Rejestracja z tokenem zaproszenia | Publiczny |
 | `POST` | `/auth/login` | Logowanie (zwraca token JWT) | Publiczny |
 | `GET` | `/auth/invitation?token=` | Sprawdzenie zaproszenia przed formularzem | Publiczny |
+| `POST` | `/auth/password-reset` | Żądanie resetu hasła | Publiczny |
+| `GET` | `/auth/password-reset?token=` | Sprawdzenie tokenu resetu | Publiczny |
+| `POST` | `/auth/password-reset/confirm` | Ustawienie nowego hasła | Publiczny |
 
-> `POST /auth/register` wymaga pola `token` i zwraca **`201 Created`**. Rola konta pochodzi z zaproszenia.
-> `GET /auth/invitation` zwraca `{ email, expiresAt }` — bez roli, bo endpoint jest publiczny.
+> `POST /auth/register` wymaga pola `token` i zwraca `201 Created`. Rola konta pochodzi z zaproszenia.
+> `POST /auth/password-reset` zwraca `202 Accepted` **zawsze**, także dla nieistniejącego adresu.
+> `POST /auth/password-reset/confirm` zwraca `204 No Content`.
 
 ### Zaproszenia (`/invitations`)
 
 | Metoda | Endpoint | Opis | Dostęp |
 |--------|----------|------|--------|
-| `POST` | `/invitations` | Wystawienie zaproszenia (`{ email, role? }`) | ADMIN |
-| `GET` | `/invitations` | Lista zaproszeń z wyliczonym statusem | ADMIN |
-| `DELETE` | `/invitations/{id}` | Unieważnienie zaproszenia | ADMIN |
+| `POST` | `/invitations` | Wystawienie (`{ email, role? }`) | ADMIN |
+| `GET` | `/invitations` | Lista z wyliczonym statusem | ADMIN |
+| `DELETE` | `/invitations/{id}` | Unieważnienie | ADMIN |
 
-> `role` jest opcjonalne, domyślnie `USER`. Odpowiedź **nigdy** nie zawiera tokenu ani jego skrótu.
+> `role` opcjonalne, domyślnie `USER`. Odpowiedź **nigdy** nie zawiera tokenu ani jego skrótu.
 
 ### Profil użytkownika (`/profile`)
 
@@ -319,8 +331,9 @@ Dołączona jest również kolekcja **Postman** (`trainingplatform.postman_colle
 | `GET` | `/profile` | Pobranie profilu | USER |
 | `PUT` | `/profile` | Aktualizacja danych | USER |
 | `POST` | `/profile/change-password` | Zmiana hasła | USER |
+| `DELETE` | `/profile` | Usunięcie konta (`{ password }`) | USER |
 
-> `UserResponse` zawiera `birthDate` w formacie `yyyy-MM-dd` (typ `LocalDate`).
+> `UserResponse` zawiera `birthDate` w formacie `yyyy-MM-dd`.
 
 ### Kategorie treningów (`/workout-categories`)
 
@@ -353,17 +366,17 @@ Dołączona jest również kolekcja **Postman** (`trainingplatform.postman_colle
 | `PUT` | `/workout-logs/{id}` | Edycja wpisu | USER |
 | `DELETE` | `/workout-logs/{id}` | Usunięcie wpisu | USER |
 
-> Wpis dziennika zawiera opcjonalny `title` oraz `performedTime` — godzinę rozpoczęcia w formacie `HH:mm`.
+> Wpis zawiera opcjonalny `title` oraz `performedTime` — godzinę rozpoczęcia w formacie `HH:mm`.
 
 ---
 
 ## ⚠️ Obsługa błędów
 
-Wszystkie błędy zwracane są w jednolitym formacie JSON:
+Wszystkie błędy w jednolitym formacie JSON:
 
 ```json
 {
-  "timestamp": "2026-08-26T10:15:30.123",
+  "timestamp": "2026-08-27T10:15:30.123",
   "status": 404,
   "message": "Nie znaleziono zaproszenia o identyfikatorze 42"
 }
@@ -371,9 +384,9 @@ Wszystkie błędy zwracane są w jednolitym formacie JSON:
 
 | Kod | Kiedy występuje | Przykład |
 |-----|-----------------|----------|
-| `400` | Błąd walidacji, niepoprawne dane, nieważne zaproszenie | brak tokenu, zaproszenie wygasłe lub wykorzystane |
+| `400` | Błąd walidacji, niepoprawne dane, nieważny token zaproszenia lub resetu, błędne hasło przy usuwaniu konta | brak tokenu, link wygasły lub wykorzystany |
 | `401` | Brak/nieważny token JWT albo błędne dane logowania | żądanie bez nagłówka `Authorization` |
-| `403` | Użytkownik zalogowany, ale bez uprawnień do zasobu | USER na endpoincie ADMIN, cudzy plan treningowy |
+| `403` | Brak uprawnień do zasobu; próba usunięcia ostatniego administratora | USER na endpoincie ADMIN |
 | `404` | Zasób nie istnieje | `GET /training-plans/9999` |
 | `409` | Konflikt danych | adres ma już konto, unieważnienie wykorzystanego zaproszenia |
 | `500` | Nieoczekiwany błąd serwera | — |
@@ -382,7 +395,7 @@ Przy błędach walidacji odpowiedź zawiera dodatkowo mapę `errors` z komunikat
 
 ```json
 {
-  "timestamp": "2026-08-26T10:15:30.123",
+  "timestamp": "2026-08-27T10:15:30.123",
   "status": 400,
   "message": "Błąd walidacji",
   "errors": {
@@ -395,8 +408,9 @@ Przy błędach walidacji odpowiedź zawiera dodatkowo mapę `errors` z komunikat
 ### Uwagi
 
 - **Rozróżnienie 401 / 403.** `401` oznacza „nie wiem, kim jesteś" — brak tokenu, token wygasły lub błędne dane logowania. `403` oznacza „wiem, kim jesteś, ale nie wolno ci". Żądanie bez tokenu na chroniony endpoint zwraca `401` z ciałem JSON, nie puste `403`.
-- **Logowanie nie zdradza, co poszło nie tak.** Nieistniejące konto i błędne hasło zwracają identyczny komunikat *„Nieprawidłowy e-mail lub hasło"* — zapobiega to enumeracji kont.
-- **Nieważne zaproszenie to `400`**, a nie `404` — z komunikatem rozróżniającym przypadki („nie istnieje", „wygasło", „zostało już wykorzystane", „zostało unieważnione"). Frontend wyświetla `message` z odpowiedzi.
+- **Nieważny token to `400`, nie `404`** — z komunikatem rozróżniającym przypadki („nie istnieje", „wygasło", „zostało już wykorzystane", „zostało unieważnione"). Frontend wyświetla `message` z odpowiedzi.
+- **Komunikaty nie zdradzają istnienia kont.** Logowanie zwraca ten sam tekst dla nieistniejącego adresu i złego hasła; żądanie resetu zwraca `202` niezależnie od tego, czy konto istnieje.
+- **Dwa różne `403`.** `Brak uprawnień` to odmowa autoryzacji — komunikat celowo nic nie mówi. `Nie można usunąć konta ostatniego administratora` to reguła biznesowa — tu komunikat pomaga, bo użytkownik może zaprosić drugiego administratora i spróbować ponownie.
 - **Komunikaty są po polsku** i nadają się do pokazania użytkownikowi bez tłumaczenia.
 
 ---
@@ -406,7 +420,8 @@ Przy błędach walidacji odpowiedź zawiera dodatkowo mapę `errors` z komunikat
 | Tabela | Opis |
 |--------|------|
 | `users` | Konta użytkowników (rola USER/ADMIN, `birth_date` typu `DATE`) |
-| `invitation` | Zaproszenia do rejestracji (`token_hash`, `role`, `expires_at`, `sent_at`, `used_at`, `revoked_at`) |
+| `invitation` | Zaproszenia (`token_hash`, `role`, `expires_at`, `sent_at`, `used_at`, `revoked_at`) |
+| `password_reset_token` | Jednorazowe tokeny resetu hasła (`token_hash`, `expires_at`, `used_at`) |
 | `workout_category` | Słownik kategorii treningów |
 | `training_plan` | Zaplanowane treningi (kalendarz) |
 | `workout_log` | Dziennik wykonanych treningów (`title`, `performed_date`, `performed_time`) |
@@ -419,7 +434,15 @@ Przy błędach walidacji odpowiedź zawiera dodatkowo mapę `errors` z komunikat
 - Wpis w dzienniku może być opcjonalnie powiązany z planem (lub dodany ad-hoc)
 - Kategoria nie może zostać usunięta, jeśli jest używana przez plany lub wpisy (BR-06)
 - Usunięcie planu odpina powiązane wpisy (`plan_id` → `NULL`), nie kasuje ich
-- Każde zaproszenie wskazuje administratora, który je wystawił (`invited_by`)
+
+### Zachowanie kluczy obcych przy usuwaniu konta
+
+| Relacja | Akcja | Dlaczego |
+|---|---|---|
+| `training_plan.user_id` | `CASCADE` | dane użytkownika |
+| `workout_log.user_id` | `CASCADE` | dane użytkownika |
+| `password_reset_token.user_id` | `CASCADE` | efemeryda |
+| `invitation.invited_by` | **`SET NULL`** | rekord dokumentuje, jak do systemu trafił **ktoś inny** |
 
 ### Status zaproszenia nie jest kolumną
 
@@ -440,6 +463,9 @@ Kolejność jest istotna: zaproszenie wykorzystane pozostaje `ACCEPTED` nawet po
 - `idx_workout_log_user_performed_date` — `workout_log (user_id, performed_date)`
 - `idx_workout_log_user_category_performed_date` — `workout_log (user_id, category_id, performed_date)`
 - `idx_invitation_pending_email` — **częściowy indeks unikalny** na `invitation (email) WHERE used_at IS NULL AND revoked_at IS NULL`; gwarantuje jedno oczekujące zaproszenie na adres
+- `idx_password_reset_token_user` — `password_reset_token (user_id)`
+
+> Przy tokenach resetu **nie ma** analogicznego indeksu częściowego. Wygaśnięcie nie zmienia żadnej kolumny, więc `WHERE used_at IS NULL` uznawałby wygasły token za wciąż oczekujący i blokował kolejne żądanie na zawsze. Jedno aktywne żądanie zapewnia serwis, kasując poprzednie tokeny.
 
 ### Statusy planu (`PlanStatus`)
 
@@ -453,22 +479,24 @@ Kolejność jest istotna: zaproszenie wykorzystane pozostaje `ACCEPTED` nawet po
 ./mvnw test
 ```
 
-Projekt zawiera 159 testów w trzech warstwach:
+Projekt zawiera **190 testów** w trzech warstwach:
 
 **Testy jednostkowe serwisów** (JUnit 5 + Mockito):
 
 - Rejestracja związana z zaproszeniem, logowanie, bootstrap administratora
 - Cykl życia zaproszenia: generowanie tokenu, unieważnianie poprzedniego, wygaśnięcie, jednorazowość
+- Reset hasła: jednorazowość tokenu, brak zdradzania istnienia konta, awaria wysyłki
+- Usuwanie konta: potwierdzenie hasłem, ochrona ostatniego administratora, kolejność operacji
 - Zarządzanie profilem i zmiana hasła
-- CRUD kategorii z walidacją unikalności i ochroną przed usunięciem używanej kategorii
-- CRUD planów treningowych z walidacją własności (403/404)
-- CRUD dziennika z obsługą wpisów ad-hoc i powiązań z planami
+- CRUD kategorii, planów i dziennika z walidacją własności
 
 **Testy kontrolerów** (`@WebMvcTest` + MockMvc) — mapowanie ścieżek, kody odpowiedzi, kontrola roli ADMIN, walidacja żądań.
 
-**Test kontekstu** (`@SpringBootTest` + Testcontainers) — podnosi aplikację na realnym PostgreSQL 15 w kontenerze i wykonuje pełny łańcuch migracji Flyway od zera. Wymaga uruchomionego Dockera.
+**Test kontekstu** (`@SpringBootTest` + Testcontainers) — podnosi aplikację na realnym PostgreSQL 15 i wykonuje pełny łańcuch migracji od zera. Wymaga uruchomionego Dockera.
 
-> Testy nie używają H2 — baza w testach jest tą samą bazą co na produkcji, więc różnice w dialekcie SQL i typach kolumn wychodzą na etapie testu. Testy nigdy nie wysyłają maili: `app.mail.provider` domyślnie stoi na `log`.
+> Testy nie używają H2 — baza w testach jest tą samą bazą co na produkcji. Testy nigdy nie wysyłają maili: `app.mail.provider` domyślnie stoi na `log`.
+
+⚠️ Testy jednostkowe **nie sprawdzą transakcyjności ani kaskad w bazie** — atrapy repozytoriów nie mają transakcji, a `verify(repository).delete(...)` nie mówi nic o tym, co zrobił Postgres. Te ścieżki weryfikuje kolekcja Postmana i test kontekstu.
 
 ---
 
