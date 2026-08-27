@@ -2,33 +2,37 @@ package pl.tomaszosuch.trainingplatform_backend.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.ChangePasswordRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.DeleteAccountRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
+import pl.tomaszosuch.trainingplatform_backend.exception.LastAdminException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
+import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.ProfileServiceImpl;
 
+import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,6 +50,9 @@ public class ProfileServiceImplTest {
 
     @Mock
     private UserMapper userMapper;
+
+    @Mock
+    private InvitationRepository invitationRepository;
 
     private User existingUser;
 
@@ -219,5 +226,132 @@ public class ProfileServiceImplTest {
                 () -> profileService.changePassword(99L, request));
 
         verify(userRepository, never()).save(any());
+    }
+
+    @Nested
+    @DisplayName("deleteAccount()")
+    class DeleteAccountTests {
+
+        private static final String PASSWORD = "MojeHaslo123";
+
+        private User accountOwner;
+
+        @BeforeEach
+        void prepareOwner() {
+            accountOwner = User.builder()
+                    .id(3L)
+                    .email("jan@example.com")
+                    .password("$2a$10$zahashowane")
+                    .firstName("Jan")
+                    .lastName("Kowalski")
+                    .role(Role.USER)
+                    .isActive(true)
+                    .build();
+        }
+
+        @Test
+        @DisplayName("usuwa konto po potwierdzeniu hasłem")
+        void shouldDeleteAccountWhenPasswordMatches() {
+            when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
+            when(passwordEncoder.matches(PASSWORD, "$2a$10$zahashowane")).thenReturn(true);
+
+            profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD));
+
+            verify(userRepository).delete(accountOwner);
+        }
+
+        @Test
+        @DisplayName("unieważnia oczekujące zaproszenia PRZED usunięciem konta")
+        void shouldRevokeInvitationsBeforeDeletingAccount() {
+            when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
+            when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
+
+            profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD));
+
+            InOrder order = inOrder(invitationRepository, userRepository);
+            order.verify(invitationRepository).revokePendingByInviter(eq(3L), any(LocalDateTime.class));
+            order.verify(userRepository).delete(accountOwner);
+        }
+
+        @Test
+        @DisplayName("odrzuca złe hasło i niczego nie usuwa")
+        void shouldRejectWrongPassword() {
+            when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
+            when(passwordEncoder.matches("ZleHaslo", "$2a$10$zahashowane")).thenReturn(false);
+
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                    () -> profileService.deleteAccount(3L, new DeleteAccountRequest("ZleHaslo")));
+
+            assertTrue(ex.getMessage().contains("Nieprawidłowe hasło"));
+
+            verify(userRepository, never()).delete(any(User.class));
+            verify(invitationRepository, never()).revokePendingByInviter(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("nie pozwala usunąć konta ostatniego administratora")
+        void shouldBlockLastAdmin() {
+            accountOwner.setRole(Role.ADMIN);
+
+            when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
+            when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
+            when(userRepository.countByRole(Role.ADMIN)).thenReturn(1L);
+
+            assertThrows(LastAdminException.class,
+                    () -> profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD)));
+
+            verify(userRepository, never()).delete(any(User.class));
+            verify(invitationRepository, never()).revokePendingByInviter(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("pozwala usunąć administratora, gdy jest jeszcze inny")
+        void shouldAllowAdminDeletionWhenAnotherAdminExists() {
+            accountOwner.setRole(Role.ADMIN);
+
+            when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
+            when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
+            when(userRepository.countByRole(Role.ADMIN)).thenReturn(2L);
+
+            profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD));
+
+            verify(userRepository).delete(accountOwner);
+        }
+
+        @Test
+        @DisplayName("nie liczy administratorów przy usuwaniu zwykłego konta")
+        void shouldNotCountAdminsForRegularUser() {
+            when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
+            when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
+
+            profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD));
+
+            verify(userRepository, never()).countByRole(any(Role.class));
+        }
+
+        @Test
+        @DisplayName("sprawdza hasło zanim sięgnie po liczbę administratorów")
+        void shouldVerifyPasswordBeforeCheckingAdminCount() {
+            accountOwner.setRole(Role.ADMIN);
+
+            when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
+            when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
+
+            assertThrows(IllegalArgumentException.class,
+                    () -> profileService.deleteAccount(3L, new DeleteAccountRequest("ZleHaslo")));
+
+            verify(userRepository, never()).countByRole(any(Role.class));
+        }
+
+        @Test
+        @DisplayName("rzuca wyjątek dla nieistniejącego konta")
+        void shouldThrowWhenAccountDoesNotExist() {
+            when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+            assertThrows(UserNotFoundException.class,
+                    () -> profileService.deleteAccount(99L, new DeleteAccountRequest(PASSWORD)));
+
+            verify(userRepository, never()).delete(any(User.class));
+        }
     }
 }

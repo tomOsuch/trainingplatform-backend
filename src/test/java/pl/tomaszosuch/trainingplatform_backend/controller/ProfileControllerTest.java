@@ -11,10 +11,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.ChangePasswordRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.DeleteAccountRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
+import pl.tomaszosuch.trainingplatform_backend.exception.LastAdminException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
 import pl.tomaszosuch.trainingplatform_backend.service.ProfileService;
@@ -36,292 +38,353 @@ import java.time.LocalDate;
 @DisplayName("ProfileControllerTest")
 public class ProfileControllerTest {
 
-        @Autowired
-        private MockMvc mockMvc;
+    @Autowired
+    private MockMvc mockMvc;
 
-        @Autowired
-        private ObjectMapper objectMapper;
+    @Autowired
+    private ObjectMapper objectMapper;
 
-        @MockitoBean
-        private ProfileService profileService;
+    @MockitoBean
+    private ProfileService profileService;
 
-        private User currentUser;
-        private UserResponse userResponse;
+    private User currentUser;
+    private UserResponse userResponse;
 
-        @BeforeEach
-        void setUp() {
-                currentUser = User.builder()
-                                .id(1L)
-                                .email("jankowalski@example.com")
-                                .firstName("Jan")
-                                .lastName("Kowalski")
-                                .role(Role.USER)
-                                .isActive(true)
-                                .build();
+    @BeforeEach
+    void setUp() {
+        currentUser = User.builder()
+                .id(1L)
+                .email("jankowalski@example.com")
+                .firstName("Jan")
+                .lastName("Kowalski")
+                .role(Role.USER)
+                .isActive(true)
+                .build();
 
-                userResponse = new UserResponse(
-                                1L,
-                                "jan@example.com",
-                                "Jan",
-                                "Kowalski",
-                                LocalDate.of(1990, 5, 14),
-                                Role.USER);
-        }
+        userResponse = new UserResponse(
+                1L,
+                "jan@example.com",
+                "Jan",
+                "Kowalski",
+                LocalDate.of(1990, 5, 14),
+                Role.USER);
+    }
 
-        @Test
-        @DisplayName("powinien zrobic 200 z profilem zalogowanego uzytkownika")
-        public void shouldReturnUserProfileWhenUserIsAuthenticated() throws Exception {
-                // given
-                when(profileService.getProfile(1L)).thenReturn(userResponse);
+    @Test
+    @DisplayName("powinien zrobic 200 z profilem zalogowanego uzytkownika")
+    public void shouldReturnUserProfileWhenUserIsAuthenticated() throws Exception {
+        // given
+        when(profileService.getProfile(1L)).thenReturn(userResponse);
 
-                // when & then
-                mockMvc.perform(get("/profile")
-                                .with(user(currentUser)))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.id").value(1L))
-                                .andExpect(jsonPath("$.email").value("jan@example.com"))
-                                .andExpect(jsonPath("$.firstName").value("Jan"))
-                                .andExpect(jsonPath("$.lastName").value("Kowalski"))
-                                .andExpect(jsonPath("$.birthDate").value("1990-05-14"))
-                                .andExpect(jsonPath("$.role").value("USER"));
+        // when & then
+        mockMvc.perform(get("/profile")
+                        .with(user(currentUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.email").value("jan@example.com"))
+                .andExpect(jsonPath("$.firstName").value("Jan"))
+                .andExpect(jsonPath("$.lastName").value("Kowalski"))
+                .andExpect(jsonPath("$.birthDate").value("1990-05-14"))
+                .andExpect(jsonPath("$.role").value("USER"));
 
-                verify(profileService).getProfile(1L);
-        }
+        verify(profileService).getProfile(1L);
+    }
 
-        @Test
-        @DisplayName("powinien zrobic 404 gdy uzytkownik nie istnieje")
-        public void shouldReturnNotFoundWhenUserDoesNotExist() throws Exception {
+    @Test
+    @DisplayName("powinien zrobic 404 gdy uzytkownik nie istnieje")
+    public void shouldReturnNotFoundWhenUserDoesNotExist() throws Exception {
 
-                // given
-                when(profileService.getProfile(1L)).thenThrow(new UserNotFoundException("User not found"));
+        // given
+        when(profileService.getProfile(1L)).thenThrow(new UserNotFoundException("User not found"));
 
-                // when & then
-                mockMvc.perform(get("/profile")
-                                .with(user(currentUser)))
-                                .andExpect(status().isNotFound())
-                                .andExpect(jsonPath("$.status").value(404));
-        }
+        // when & then
+        mockMvc.perform(get("/profile")
+                        .with(user(currentUser)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
+    }
 
-        @Test
-        @DisplayName("powinien zwrocic 200 gdy profil zostaje zaktualizowany")
-        public void shouldReturnOkWhenUserProfileIsUpdated() throws Exception {
-        
-                // given
-                UpdateProfileRequest request = new UpdateProfileRequest(
-                        "Anna", "Nowak", LocalDate.of(1990, 5, 14)
-                );
+    @Test
+    @DisplayName("powinien zwrocic 200 gdy profil zostaje zaktualizowany")
+    public void shouldReturnOkWhenUserProfileIsUpdated() throws Exception {
 
-                when(profileService.updateProfile(eq(1L), any(UpdateProfileRequest.class)))
-                        .thenReturn(userResponse);
+        // given
+        UpdateProfileRequest request = new UpdateProfileRequest(
+                "Anna", "Nowak", LocalDate.of(1990, 5, 14)
+        );
 
-                // when & then
-                mockMvc.perform(put("/profile")
-                                .with(user(currentUser))
-                                .with(csrf())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.id").value(1L));
+        when(profileService.updateProfile(eq(1L), any(UpdateProfileRequest.class)))
+                .thenReturn(userResponse);
 
-                verify(profileService).updateProfile(eq(1L), any(UpdateProfileRequest.class));
-        }
+        // when & then
+        mockMvc.perform(put("/profile")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L));
 
-        @Test
-        @DisplayName("powinien zwrocic 400 gdy imie jest puste podczas aktualizacji profilu")
-        public void shouldReturnBadRequestWhenFirstNameIsEmptyDuringProfileUpdate() throws Exception {
-                // given
-                UpdateProfileRequest request = new UpdateProfileRequest(
-                        "", "Nowak", LocalDate.of(1990, 5, 14)
-                );
+        verify(profileService).updateProfile(eq(1L), any(UpdateProfileRequest.class));
+    }
 
-                // when & then
-                mockMvc.perform(put("/profile")
-                                .with(user(currentUser))
-                                .with(csrf())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isBadRequest())
-                                .andExpect(jsonPath("$.status").value(400));
+    @Test
+    @DisplayName("powinien zwrocic 400 gdy imie jest puste podczas aktualizacji profilu")
+    public void shouldReturnBadRequestWhenFirstNameIsEmptyDuringProfileUpdate() throws Exception {
+        // given
+        UpdateProfileRequest request = new UpdateProfileRequest(
+                "", "Nowak", LocalDate.of(1990, 5, 14)
+        );
 
-                verify(profileService, never()).updateProfile(anyLong(), any(UpdateProfileRequest.class));
-        }
+        // when & then
+        mockMvc.perform(put("/profile")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
 
-        @Test
-        @DisplayName("powinien zwrocic 400 gdy nazwisko jest puste podczas aktualizacji profilu")
-        public void shouldReturnBadRequestWhenLastNameIsEmptyDuringProfileUpdate() throws Exception {
-                // given
-                UpdateProfileRequest request = new UpdateProfileRequest(
-                        "Anna", "", LocalDate.of(1990, 5, 14)
-                );
+        verify(profileService, never()).updateProfile(anyLong(), any(UpdateProfileRequest.class));
+    }
 
-                // when & then
-                mockMvc.perform(put("/profile")
-                                .with(user(currentUser))
-                                .with(csrf())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
-                                .andExpect(status().isBadRequest())
-                                .andExpect(jsonPath("$.status").value(400));    
+    @Test
+    @DisplayName("powinien zwrocic 400 gdy nazwisko jest puste podczas aktualizacji profilu")
+    public void shouldReturnBadRequestWhenLastNameIsEmptyDuringProfileUpdate() throws Exception {
+        // given
+        UpdateProfileRequest request = new UpdateProfileRequest(
+                "Anna", "", LocalDate.of(1990, 5, 14)
+        );
 
-                verify(profileService, never()).updateProfile(anyLong(), any(UpdateProfileRequest.class));
-        }
+        // when & then
+        mockMvc.perform(put("/profile")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
 
-          @Test
-        @DisplayName("powinien zwrócić 400 gdy data urodzenia jest w przyszłości")
-        void shouldReturn400WhenBirthDateIsInFuture() throws Exception {
-            // given
-            UpdateProfileRequest invalidRequest = new UpdateProfileRequest(
+        verify(profileService, never()).updateProfile(anyLong(), any(UpdateProfileRequest.class));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy data urodzenia jest w przyszłości")
+    void shouldReturn400WhenBirthDateIsInFuture() throws Exception {
+        // given
+        UpdateProfileRequest invalidRequest = new UpdateProfileRequest(
                 "Anna", "Nowak", LocalDate.now().plusDays(1)
-            );
+        );
 
-            // when & then
-            mockMvc.perform(put("/profile")
-                    .with(user(currentUser))
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(invalidRequest)))
+        // when & then
+        mockMvc.perform(put("/profile")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.birthDate").exists());
 
-            verify(profileService, never()).updateProfile(any(), any());
-        }
+        verify(profileService, never()).updateProfile(any(), any());
+    }
 
-        @Test
-        @DisplayName("powinien zwrócić 404 gdy użytkownik nie istnieje podczas tworzenia profilu")
-        void shouldReturn404WhenUserNotFoundDuringProfileCreation() throws Exception {
-            // given
-            UpdateProfileRequest request = new UpdateProfileRequest(
+    @Test
+    @DisplayName("powinien zwrócić 404 gdy użytkownik nie istnieje podczas tworzenia profilu")
+    void shouldReturn404WhenUserNotFoundDuringProfileCreation() throws Exception {
+        // given
+        UpdateProfileRequest request = new UpdateProfileRequest(
                 "Anna", "Nowak", null);
 
-            when(profileService.updateProfile(eq(1L), any(UpdateProfileRequest.class)))
+        when(profileService.updateProfile(eq(1L), any(UpdateProfileRequest.class)))
                 .thenThrow(new UserNotFoundException(1L));
 
-            // when & then
-            mockMvc.perform(put("/profile")
-                    .with(user(currentUser))
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
+        // when & then
+        mockMvc.perform(put("/profile")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
-        }
+    }
 
-        @Test
-        @DisplayName("powinien zwrócić 200 gdy hasło zostało zmienione")
-        void shouldReturn200WhenPasswordChanged() throws Exception {
-            // given
-            ChangePasswordRequest request = new ChangePasswordRequest(
+    @Test
+    @DisplayName("powinien zwrócić 200 gdy hasło zostało zmienione")
+    void shouldReturn200WhenPasswordChanged() throws Exception {
+        // given
+        ChangePasswordRequest request = new ChangePasswordRequest(
                 "stareHaslo", "noweHaslo123", "noweHaslo123");
 
-            doNothing().when(profileService)
+        doNothing().when(profileService)
                 .changePassword(eq(1L), any(ChangePasswordRequest.class));
 
-            // when & then
-            mockMvc.perform(post("/profile/change-password")
-                    .with(user(currentUser))
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
+        // when & then
+        mockMvc.perform(post("/profile/change-password")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-            verify(profileService).changePassword(eq(1L), any(ChangePasswordRequest.class));
-        }
+        verify(profileService).changePassword(eq(1L), any(ChangePasswordRequest.class));
+    }
 
-        @Test
-        @DisplayName("powinien zwrócić 400 gdy aktualne hasło jest puste")
-        void shouldReturn400WhenCurrentPasswordIsBlank() throws Exception {
-            // given
-            ChangePasswordRequest invalidRequest = new ChangePasswordRequest(
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy aktualne hasło jest puste")
+    void shouldReturn400WhenCurrentPasswordIsBlank() throws Exception {
+        // given
+        ChangePasswordRequest invalidRequest = new ChangePasswordRequest(
                 "", "noweHaslo123", "noweHaslo123");
 
-            // when & then
-            mockMvc.perform(post("/profile/change-password")
-                    .with(user(currentUser))
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(invalidRequest)))
+        // when & then
+        mockMvc.perform(post("/profile/change-password")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.currentPassword").exists());
 
-            verify(profileService, never()).changePassword(any(), any());
-        }
+        verify(profileService, never()).changePassword(any(), any());
+    }
 
-        @Test
-        @DisplayName("powinien zwrócić 400 gdy nowe hasło jest za krótkie")
-        void shouldReturn400WhenNewPasswordIsTooShort() throws Exception {
-            // given
-            ChangePasswordRequest invalidRequest = new ChangePasswordRequest(
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy nowe hasło jest za krótkie")
+    void shouldReturn400WhenNewPasswordIsTooShort() throws Exception {
+        // given
+        ChangePasswordRequest invalidRequest = new ChangePasswordRequest(
                 "stareHaslo", "abc", "abc");
 
-            // when & then
-            mockMvc.perform(post("/profile/change-password")
-                    .with(user(currentUser))
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(invalidRequest)))
+        // when & then
+        mockMvc.perform(post("/profile/change-password")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.newPassword").exists());
 
-            verify(profileService, never()).changePassword(any(), any());
-        }
+        verify(profileService, never()).changePassword(any(), any());
+    }
 
-        @Test
-        @DisplayName("powinien zwrócić 400 gdy hasła nie są zgodne")
-        void shouldReturn400WhenPasswordsDoNotMatch() throws Exception {
-            // given
-            ChangePasswordRequest request = new ChangePasswordRequest(
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy hasła nie są zgodne")
+    void shouldReturn400WhenPasswordsDoNotMatch() throws Exception {
+        // given
+        ChangePasswordRequest request = new ChangePasswordRequest(
                 "stareHaslo", "noweHaslo123", "inneHaslo123");
 
-            doThrow(new IllegalArgumentException("Hasła nie są zgodne"))
+        doThrow(new IllegalArgumentException("Hasła nie są zgodne"))
                 .when(profileService).changePassword(eq(1L), any());
 
-            // when & then
-            mockMvc.perform(post("/profile/change-password")
-                    .with(user(currentUser))
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
+        // when & then
+        mockMvc.perform(post("/profile/change-password")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Hasła nie są zgodne"));
-        }
+    }
 
-        @Test
-        @DisplayName("powinien zwrócić 400 gdy nowe hasło jest takie samo jak stare")
-        void shouldReturn400WhenNewPasswordSameAsOld() throws Exception {
-            // given
-            ChangePasswordRequest request = new ChangePasswordRequest(
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy nowe hasło jest takie samo jak stare")
+    void shouldReturn400WhenNewPasswordSameAsOld() throws Exception {
+        // given
+        ChangePasswordRequest request = new ChangePasswordRequest(
                 "stareHaslo", "stareHaslo", "stareHaslo");
 
-            doThrow(new IllegalArgumentException(
-                    "Nowe hasło musi różnić się od aktualnego"))
+        doThrow(new IllegalArgumentException(
+                "Nowe hasło musi różnić się od aktualnego"))
                 .when(profileService).changePassword(eq(1L), any());
 
-            // when & then
-            mockMvc.perform(post("/profile/change-password")
-                    .with(user(currentUser))
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
+        // when & then
+        mockMvc.perform(post("/profile/change-password")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message")
-                    .value("Nowe hasło musi różnić się od aktualnego"));
-        }
+                        .value("Nowe hasło musi różnić się od aktualnego"));
+    }
 
-        @Test
-        @DisplayName("powinien zwrócić 404 gdy użytkownik nie istnieje")
-        void shouldReturn404WhenUserNotFound() throws Exception {
-            // given
-            ChangePasswordRequest request = new ChangePasswordRequest(
+    @Test
+    @DisplayName("powinien zwrócić 404 gdy użytkownik nie istnieje")
+    void shouldReturn404WhenUserNotFound() throws Exception {
+        // given
+        ChangePasswordRequest request = new ChangePasswordRequest(
                 "stareHaslo", "noweHaslo123", "noweHaslo123");
 
-            doThrow(new UserNotFoundException(1L))
+        doThrow(new UserNotFoundException(1L))
                 .when(profileService).changePassword(eq(1L), any());
 
-            // when & then
-            mockMvc.perform(post("/profile/change-password")
-                    .with(user(currentUser))
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
+        // when & then
+        mockMvc.perform(post("/profile/change-password")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
-        }
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 204 po usunięciu konta")
+    public void shouldReturn204WhenAccountDeleted() throws Exception {
+        mockMvc.perform(delete("/profile")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new DeleteAccountRequest("MojeHaslo123"))))
+                .andExpect(status().isNoContent());
+
+        verify(profileService).deleteAccount(eq(1L), any(DeleteAccountRequest.class));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy nie podano hasła")
+    public void shouldReturn400WhenPasswordIsMissing() throws Exception {
+        mockMvc.perform(delete("/profile")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new DeleteAccountRequest(""))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.password").exists());
+
+        verify(profileService, never()).deleteAccount(anyLong(), any(DeleteAccountRequest.class));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 400 przy nieprawidłowym haśle")
+    public void shouldReturn400WhenPasswordIsWrong() throws Exception {
+        doThrow(new IllegalArgumentException("Nieprawidłowe hasło"))
+                .when(profileService).deleteAccount(eq(1L), any(DeleteAccountRequest.class));
+
+        mockMvc.perform(delete("/profile")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new DeleteAccountRequest("ZleHaslo"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Nieprawidłowe hasło"));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 403 dla ostatniego administratora")
+    public void shouldReturn403ForLastAdmin() throws Exception {
+        doThrow(new LastAdminException())
+                .when(profileService).deleteAccount(eq(1L), any(DeleteAccountRequest.class));
+
+        mockMvc.perform(delete("/profile")
+                        .with(user(currentUser))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new DeleteAccountRequest("MojeHaslo123"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message").value("Nie można usunąć konta ostatniego administratora"));
+    }
 }

@@ -60,7 +60,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-            .body(new ErrorResponse(403, "Brak uprawnień"));
+                .body(new ErrorResponse(403, "Brak uprawnień"));
+    }
+
+    @ExceptionHandler(LastAdminException.class)
+    public ResponseEntity<ErrorResponse> handleLastAdmin(LastAdminException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ErrorResponse(403, ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
