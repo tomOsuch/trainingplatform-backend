@@ -26,7 +26,6 @@ public class GlobalExceptionHandler {
             WorkoutLogNotFoundException.class,
             InvitationNotFoundException.class
     })
-
     public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(new ErrorResponse(404, ex.getMessage()));
@@ -34,7 +33,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             IllegalArgumentException.class,
-            InvalidInvitationException.class
+            InvalidInvitationException.class,
+            InvalidPasswordResetTokenException.class
     })
     public ResponseEntity<ErrorResponse> handleBadRequest(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

@@ -7,3 +7,22 @@ spring:
 jwt:
   secret: test-secret-key-change-me-in-production-minimum-64-bytes-long-12345678
   expiration: 86400000
+
+# Ten plik przesłania src/main/resources/application.yml w całości, więc blok
+# app musi tu być powtórzony — klasy *Properties są @Validated i bez wartości
+# kontekst testowy nie wstanie.
+app:
+  admin:
+    email: ""
+    password: ""
+    first-name: Administrator
+    last-name: Systemu
+  mail:
+    provider: log
+    from: testy@trainingplatform.local
+  invitation:
+    expiration-days: 7
+    accept-base-url: http://localhost:5173/register
+  password-reset:
+    expiration-minutes: 60
+    reset-base-url: http://localhost:5173/reset-password

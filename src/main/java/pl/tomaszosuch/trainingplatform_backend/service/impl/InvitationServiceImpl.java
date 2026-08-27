@@ -2,7 +2,6 @@ package pl.tomaszosuch.trainingplatform_backend.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -18,7 +17,7 @@ import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.InvitationMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
-import pl.tomaszosuch.trainingplatform_backend.security.InvitationTokenGenerator;
+import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.service.EmailService;
 import pl.tomaszosuch.trainingplatform_backend.service.InvitationService;
 
@@ -29,12 +28,11 @@ import java.util.List;
 @Service
 @Transactional
 @RequiredArgsConstructor
-@EnableConfigurationProperties(InvitationProperties.class)
 public class InvitationServiceImpl implements InvitationService {
 
     private final InvitationRepository invitationRepository;
     private final UserRepository userRepository;
-    private final InvitationTokenGenerator tokenGenerator;
+    private final SecureTokenGenerator tokenGenerator;
     private final InvitationMapper invitationMapper;
     private final EmailService emailService;
     private final InvitationProperties properties;

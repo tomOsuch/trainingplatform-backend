@@ -20,7 +20,7 @@ import pl.tomaszosuch.trainingplatform_backend.exception.InvalidInvitationExcept
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
-import pl.tomaszosuch.trainingplatform_backend.security.InvitationTokenGenerator;
+import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtTokenProvider;
 import pl.tomaszosuch.trainingplatform_backend.service.AuthService;
 
@@ -37,7 +37,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final JwtTokenProvider jwtTokenProvider;
     private final InvitationRepository invitationRepository;
-    private final InvitationTokenGenerator invitationTokenGenerator;
+    private final SecureTokenGenerator invitationTokenGenerator;
 
     @Override
     public UserResponse register(RegisterRequest request) {
