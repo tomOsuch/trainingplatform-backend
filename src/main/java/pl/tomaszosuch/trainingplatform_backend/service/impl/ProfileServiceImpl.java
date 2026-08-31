@@ -18,6 +18,7 @@ import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.ProfileService;
+import pl.tomaszosuch.trainingplatform_backend.service.RefreshTokenService;
 
 import java.time.LocalDateTime;
 
@@ -31,6 +32,7 @@ public class ProfileServiceImpl implements ProfileService {
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final InvitationRepository invitationRepository;
+    private final RefreshTokenService refreshTokenService;
 
     @Override
     public UserResponse getProfile(Long id) {
@@ -75,8 +77,14 @@ public class ProfileServiceImpl implements ProfileService {
             throw new IllegalArgumentException("Nowe hasło musi różnić się od aktualnego");
         }
 
+        String email = user.getEmail();
+
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         userRepository.save(user);
+
+        refreshTokenService.revokeAllForUser(id);
+
+        log.info("Zmieniono hasło konta {} — unieważniono wszystkie sesje", email);
     }
 
     @Override

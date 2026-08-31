@@ -56,6 +56,9 @@ public class PasswordResetServiceImplTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     @Captor
     private ArgumentCaptor<PasswordResetToken> tokenCaptor;
 
@@ -79,7 +82,8 @@ public class PasswordResetServiceImplTest {
                 tokenGenerator,
                 passwordEncoder,
                 emailService,
-                properties);
+                properties,
+                refreshTokenService);
 
         user = User.builder()
                 .id(4L)

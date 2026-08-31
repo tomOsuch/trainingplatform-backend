@@ -1,5 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.controller;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -19,6 +20,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import jakarta.servlet.http.Cookie;
+
+import pl.tomaszosuch.trainingplatform_backend.config.RefreshTokenProperties;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.LoginRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.PasswordResetConfirmRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.PasswordResetRequest;
@@ -31,17 +35,21 @@ import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidCredentialsException;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidInvitationException;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidPasswordResetTokenException;
+import pl.tomaszosuch.trainingplatform_backend.exception.InvalidRefreshTokenException;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
+import pl.tomaszosuch.trainingplatform_backend.security.RefreshTokenCookieFactory;
+import pl.tomaszosuch.trainingplatform_backend.service.AuthService;
 import pl.tomaszosuch.trainingplatform_backend.service.PasswordResetService;
+import pl.tomaszosuch.trainingplatform_backend.service.RefreshTokenService;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AuthServiceImpl;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @WebMvcTest(controllers = AuthController.class,
-    excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(
-        type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE,
-        classes = JwtAuthenticationFilter.class))
+        excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(
+                type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE,
+                classes = JwtAuthenticationFilter.class))
 @WithMockUser
 @org.springframework.context.annotation.Import(AuthControllerTest.TestConfig.class)
 @DisplayName("AuthControllerTest")
@@ -65,12 +73,24 @@ public class AuthControllerTest {
         ObjectMapper objectMapper() {
             return new ObjectMapper();
         }
+
+        @org.springframework.context.annotation.Bean
+        RefreshTokenCookieFactory refreshTokenCookieFactory() {
+            RefreshTokenProperties properties = new RefreshTokenProperties();
+            properties.setExpirationDays(14);
+            properties.setCookieName("refreshToken");
+            properties.setCookiePath("/api/auth");
+            properties.setCookieSecure(false);
+            properties.setCookieSameSite("Lax");
+            return new RefreshTokenCookieFactory(properties);
+        }
     }
 
     private RegisterRequest validRegister;
     private LoginRequest validLogin;
     private UserResponse userResponse;
     private LoginResponse loginResponse;
+    private AuthService.LoginResult loginResult;
 
     @BeforeEach
     void setUp() {
@@ -78,6 +98,9 @@ public class AuthControllerTest {
         validLogin = new LoginRequest("jan.kowalski@example.com", "password");
         userResponse = new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER);
         loginResponse = new LoginResponse("token", 1L, "jan.kowalski@example.com", Role.USER);
+        loginResult = new AuthService.LoginResult(
+                loginResponse,
+                new RefreshTokenService.IssuedToken("surowy-refresh-token", LocalDateTime.now().plusDays(14)));
     }
 
     @Test
@@ -85,12 +108,12 @@ public class AuthControllerTest {
     public void shouldReturn201WhenRegistrationSucceeds() throws Exception {
         //given
         when(authService.register(any(RegisterRequest.class))).thenReturn(userResponse);
-        
+
         // when & then
         mockMvc.perform(post("/auth/register")
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(validRegister)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRegister)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.email").value("jan.kowalski@example.com"))
@@ -107,15 +130,15 @@ public class AuthControllerTest {
 
         // when & then
         mockMvc.perform(post("/auth/register")
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(invalidRequest)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.email").exists());
 
         verify(authService, never()).register(any(RegisterRequest.class));
     }
-    
+
     @Test
     @DisplayName("powinien zwrócić 400 gdy hasło jest za krótkie")
     public void shouldReturn400WhenPasswordIsTooShort() throws Exception {
@@ -124,9 +147,9 @@ public class AuthControllerTest {
 
         // when & then
         mockMvc.perform(post("/auth/register")
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(invalidRequest)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.password").exists());
 
@@ -143,9 +166,9 @@ public class AuthControllerTest {
 
         // when & then
         mockMvc.perform(post("/auth/register")
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(validRegister)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRegister)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(
                         "Adres e-mail jest już zajęty: jan.kowalski@example.com"));
@@ -157,38 +180,42 @@ public class AuthControllerTest {
     @DisplayName("powinien zwrócić 200 z tokenem gdy logowanie powiodło się")
     public void shouldReturn200WithTokenWhenLoginSucceeds() throws Exception {
         // given
-        when(authService.login(any(LoginRequest.class))).thenReturn(loginResponse);
+        when(authService.login(any(LoginRequest.class), any())).thenReturn(loginResult);
 
         // when & then
         mockMvc.perform(post("/auth/login")
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(validLogin)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validLogin)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("token"))
                 .andExpect(jsonPath("$.userId").value(1L))
                 .andExpect(jsonPath("$.email").value("jan.kowalski@example.com"))
-                .andExpect(jsonPath("$.role").value("USER"));
+                .andExpect(jsonPath("$.role").value("USER"))
+                .andExpect(header().string("Set-Cookie", containsString("refreshToken=surowy-refresh-token")))
+                .andExpect(header().string("Set-Cookie", containsString("HttpOnly")))
+                .andExpect(header().string("Set-Cookie", containsString("Path=/api/auth")))
+                .andExpect(header().string("Set-Cookie", containsString("SameSite=Lax")));
 
-        verify(authService).login(any(LoginRequest.class));
+        verify(authService).login(any(LoginRequest.class), any());
     }
 
     @Test
     @DisplayName("powinien zwrócić 401 gdy dane logowania są błędne")
     public void shouldReturn401WhenLoginIsInvalid() throws Exception {
         // given
-        when(authService.login(any(LoginRequest.class)))
+        when(authService.login(any(LoginRequest.class), any()))
                 .thenThrow(new InvalidCredentialsException());
 
         // when & then
         mockMvc.perform(post("/auth/login")
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(validLogin)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validLogin)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("Nieprawidłowy e-mail lub hasło"));
 
-        verify(authService).login(any(LoginRequest.class));
+        verify(authService).login(any(LoginRequest.class), any());
     }
 
     @Test
@@ -196,16 +223,85 @@ public class AuthControllerTest {
     public void shouldReturn400WhenEmailIsEmpty() throws Exception {
         // given
         LoginRequest invalidRequest = new LoginRequest("", "password");
-
         // when & then
         mockMvc.perform(post("/auth/login")
-                    .with(csrf())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(invalidRequest)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.email").exists());
 
-        verify(authService, never()).login(any(LoginRequest.class));
+        verify(authService, never()).login(any(LoginRequest.class), any());
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 200 i zrotowane ciasteczko przy odświeżeniu")
+    public void shouldReturn200AndRotatedCookieOnRefresh() throws Exception {
+        // given
+        when(authService.refresh(any(), any())).thenReturn(loginResult);
+        // when & then
+        mockMvc.perform(post("/auth/refresh")
+                        .with(csrf())
+                        .cookie(new Cookie("refreshToken", "stare-ciasteczko")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("token"))
+                .andExpect(jsonPath("$.role").value("USER"))
+                .andExpect(header().string("Set-Cookie", containsString("refreshToken=surowy-refresh-token")))
+                .andExpect(header().string("Set-Cookie", containsString("HttpOnly")));
+
+        verify(authService).refresh(any(), any());
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 401, a nie 400, gdy brakuje ciasteczka")
+    public void shouldReturn401WhenRefreshCookieIsMissing() throws Exception {
+        // given
+        when(authService.refresh(any(), any()))
+                .thenThrow(new InvalidRefreshTokenException("Brak tokena odświeżającego"));
+        // when & then
+        mockMvc.perform(post("/auth/refresh").with(csrf()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Brak tokena odświeżającego"));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 401 dla unieważnionego tokena odświeżającego")
+    public void shouldReturn401ForRevokedRefreshToken() throws Exception {
+        // given
+        when(authService.refresh(any(), any()))
+                .thenThrow(new InvalidRefreshTokenException(
+                        "Sesja została unieważniona ze względów bezpieczeństwa"));
+
+        // when & then
+        mockMvc.perform(post("/auth/refresh")
+                        .with(csrf())
+                        .cookie(new Cookie("refreshToken", "wykradzione")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 204 i skasować ciasteczko przy wylogowaniu")
+    public void shouldReturn204AndClearCookieOnLogout() throws Exception {
+        // when & then
+        mockMvc.perform(post("/auth/logout")
+                        .with(csrf())
+                        .cookie(new Cookie("refreshToken", "aktualne")))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Set-Cookie", containsString("Max-Age=0")))
+                .andExpect(header().string("Set-Cookie", containsString("Path=/api/auth")));
+
+        verify(authService).logout("aktualne");
+    }
+
+    @Test
+    @DisplayName("wylogowanie bez ciasteczka też kończy się sukcesem")
+    public void shouldReturn204OnLogoutWithoutCookie() throws Exception {
+        // when & then
+        mockMvc.perform(post("/auth/logout").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(authService).logout(null);
     }
 
     @Test
