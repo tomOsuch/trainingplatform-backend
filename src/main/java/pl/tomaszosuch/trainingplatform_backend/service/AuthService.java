@@ -9,6 +9,14 @@ import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 public interface AuthService {
 
     UserResponse register(RegisterRequest request);
-    LoginResponse login(LoginRequest request);
+
+    LoginResult login(LoginRequest request, String userAgent);
+
+    LoginResult refresh(String rawRefreshToken, String userAgent);
+
+    void logout(String rawRefreshToken);
+
     InvitationCheckResponse checkInvitation(String token);
+
+    record LoginResult(LoginResponse response, RefreshTokenService.IssuedToken refreshToken) {}
 }

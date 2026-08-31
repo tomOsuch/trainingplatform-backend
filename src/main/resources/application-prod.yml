@@ -13,3 +13,7 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+app:
+  refresh-token:
+    cookie-secure: true
+    cookie-same-site: Lax

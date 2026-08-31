@@ -18,6 +18,7 @@ import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.service.EmailService;
 import pl.tomaszosuch.trainingplatform_backend.service.PasswordResetService;
+import pl.tomaszosuch.trainingplatform_backend.service.RefreshTokenService;
 
 import java.time.LocalDateTime;
 
@@ -33,6 +34,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final PasswordResetProperties properties;
+    private final RefreshTokenService refreshTokenService;
 
     @Override
     public void requestReset(PasswordResetRequest request) {
@@ -58,13 +60,18 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         PasswordResetToken resetToken = requireUsableToken(request.token());
 
         User user = resetToken.getUser();
+        String email = user.getEmail();
+        Long userId = user.getId();
+
         user.setPassword(passwordEncoder.encode(request.password()));
         userRepository.save(user);
 
         resetToken.setUsedAt(LocalDateTime.now());
         tokenRepository.save(resetToken);
 
-        log.info("Hasło konta {} zostało zresetowane", user.getEmail());
+        refreshTokenService.revokeAllForUser(userId);
+
+        log.info("Hasło konta {} zostało zresetowane — unieważniono wszystkie sesje", email);
     }
 
     private void issueToken(User user) {

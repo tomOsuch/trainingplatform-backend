@@ -54,6 +54,9 @@ public class ProfileServiceImplTest {
     @Mock
     private InvitationRepository invitationRepository;
 
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     private User existingUser;
 
     @BeforeEach

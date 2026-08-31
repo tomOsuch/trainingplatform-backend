@@ -2,6 +2,7 @@ package pl.tomaszosuch.trainingplatform_backend.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,8 +12,10 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.PasswordResetConfirmR
 import pl.tomaszosuch.trainingplatform_backend.dto.request.PasswordResetRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.RegisterRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.InvitationCheckResponse;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.LoginResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.PasswordResetCheckResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
+import pl.tomaszosuch.trainingplatform_backend.security.RefreshTokenCookieFactory;
 import pl.tomaszosuch.trainingplatform_backend.service.AuthService;
 import pl.tomaszosuch.trainingplatform_backend.service.PasswordResetService;
 
@@ -23,6 +26,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
+    private final RefreshTokenCookieFactory cookieFactory;
 
     @PostMapping("/register")
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -31,8 +35,36 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request,
+                                   @RequestHeader(value = HttpHeaders.USER_AGENT, required = false ) String userAgent) {
+        AuthService.LoginResult result = authService.login(request, userAgent);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookieFactory.create(result.refreshToken()).toString())
+                .body(result.response());
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<LoginResponse> refresh(
+            @CookieValue(name = "${app.refresh-token.cookie-name}", required = false) String refreshToken,
+            @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
+
+        AuthService.LoginResult result = authService.refresh(refreshToken, userAgent);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookieFactory.create(result.refreshToken()).toString())
+                .body(result.response());
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @CookieValue(name = "${app.refresh-token.cookie-name}", required = false) String refreshToken) {
+
+        authService.logout(refreshToken);
+
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, cookieFactory.expired().toString())
+                .build();
     }
 
     @GetMapping("/invitation")

@@ -2,6 +2,7 @@ package pl.tomaszosuch.trainingplatform_backend.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.flywaydb.core.internal.util.StringUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -17,12 +18,14 @@ import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.EmailAlreadyRegisteredException;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidCredentialsException;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidInvitationException;
+import pl.tomaszosuch.trainingplatform_backend.exception.InvalidRefreshTokenException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtTokenProvider;
 import pl.tomaszosuch.trainingplatform_backend.service.AuthService;
+import pl.tomaszosuch.trainingplatform_backend.service.RefreshTokenService;
 
 import java.time.LocalDateTime;
 
@@ -38,6 +41,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final InvitationRepository invitationRepository;
     private final SecureTokenGenerator invitationTokenGenerator;
+    private final RefreshTokenService refreshTokenService;
 
     @Override
     public UserResponse register(RegisterRequest request) {
@@ -78,8 +82,8 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public LoginResponse login(LoginRequest request) {
-        
+    public LoginResult login(LoginRequest request, String userAgent) {
+
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(InvalidCredentialsException::new);
 
@@ -91,15 +95,41 @@ public class AuthServiceImpl implements AuthService {
             throw new InvalidCredentialsException();
         }
 
+        return buildLoginResult(user, refreshTokenService.issue(user, userAgent));
+    }
 
-        String token = jwtTokenProvider.generateToken(user.getEmail());
+    @Override
+    public LoginResult refresh(String rawRefreshToken, String userAgent) {
 
-        return new LoginResponse(
-                token,
+        if (!StringUtils.hasText(rawRefreshToken)) {
+            throw new InvalidRefreshTokenException("Brak tokena odświeżającego");
+        }
+
+        RefreshTokenService.RotationResult rotation = refreshTokenService.rotate(rawRefreshToken, userAgent);
+
+        return buildLoginResult(rotation.user(), rotation.refreshToken());
+    }
+
+    @Override
+    public void logout(String rawRefreshToken) {
+
+        if (StringUtils.hasText(rawRefreshToken)) {
+            refreshTokenService.revoke(rawRefreshToken);
+        }
+    }
+
+    private LoginResult buildLoginResult(User user, RefreshTokenService.IssuedToken refreshToken) {
+
+        String accessToken = jwtTokenProvider.generateToken(user.getEmail());
+
+        LoginResponse response = new LoginResponse(
+                accessToken,
                 user.getId(),
                 user.getEmail(),
                 user.getRole()
         );
+
+        return new LoginResult(response, refreshToken);
     }
 
     @Override

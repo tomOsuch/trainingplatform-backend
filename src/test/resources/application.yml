@@ -26,3 +26,9 @@ app:
   password-reset:
     expiration-minutes: 60
     reset-base-url: http://localhost:3000/reset-password
+  refresh-token:
+    expiration-days: 14
+    cookie-name: refreshToken
+    cookie-path: /api/auth
+    cookie-secure: false
+    cookie-same-site: Lax

@@ -65,6 +65,9 @@ public class AuthServiceImplTest {
     @Mock
     private SecureTokenGenerator invitationTokenGenerator;
 
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     @InjectMocks
     private AuthServiceImpl authService;
 
@@ -333,24 +336,26 @@ public class AuthServiceImplTest {
         @Test
         @DisplayName("powinien zwrócić token gdy dane logowania są poprawne")
         public void shouldReturnTokenWhenCredentialsAreValid() {
-            // give
+            // given
             var loginRequest = new LoginRequest("jan.kowalski@example.com", "password");
 
             when(userRepository.findByEmail(loginRequest.email())).thenReturn(Optional.of(savedUser));
             when(passwordEncoder.matches(loginRequest.password(), savedUser.getPassword())).thenReturn(true);
             when(jwtTokenProvider.generateToken(savedUser.getEmail())).thenReturn("wygenerowany.jwt.token");
+            when(refreshTokenService.issue(savedUser, "JUnit")).thenReturn(
+                    new RefreshTokenService.IssuedToken("surowy-refresh-token", LocalDateTime.now().plusDays(14)));
 
             // when
-            var response = authService.login(loginRequest);
+            var result = authService.login(loginRequest, "JUnit");
 
             // then
-            assertNotNull(response);
-            assertEquals("wygenerowany.jwt.token", response.token());
-            assertEquals("Bearer", response.type());
-            assertEquals(savedUser.getId(), response.userId());
-            assertEquals(savedUser.getEmail(), response.email());
-            assertEquals(savedUser.getRole(), response.role());
-
+            assertNotNull(result);
+            assertEquals("wygenerowany.jwt.token", result.response().token());
+            assertEquals("Bearer", result.response().type());
+            assertEquals(savedUser.getId(), result.response().userId());
+            assertEquals(savedUser.getEmail(), result.response().email());
+            assertEquals(savedUser.getRole(), result.response().role());
+            assertEquals("surowy-refresh-token", result.refreshToken().token());
         }
 
         @Test
@@ -366,10 +371,11 @@ public class AuthServiceImplTest {
             // when & then
             InvalidCredentialsException ex = assertThrows(
                     InvalidCredentialsException.class,
-                    () -> authService.login(loginRequest));
+                    () -> authService.login(loginRequest, "JUnit"));
 
             assertTrue(ex.getMessage().contains("Nieprawidłowy"));
             verify(jwtTokenProvider, never()).generateToken(anyString());
+            verify(refreshTokenService, never()).issue(any(), any());
         }
 
     }
@@ -387,10 +393,11 @@ public class AuthServiceImplTest {
         // when & then
         InvalidCredentialsException ex = assertThrows(
                 InvalidCredentialsException.class,
-                () -> authService.login(loginRequest));
+                () -> authService.login(loginRequest, "JUnit"));
 
         assertTrue(ex.getMessage().contains("Nieprawidłowy"));
         verify(jwtTokenProvider, never()).generateToken(anyString());
+        verify(refreshTokenService, never()).issue(any(), any());
     }
 
     @Test
@@ -416,10 +423,11 @@ public class AuthServiceImplTest {
         // when & then
         InvalidCredentialsException ex = assertThrows(
                 InvalidCredentialsException.class,
-                () -> authService.login(loginRequest));
+                () -> authService.login(loginRequest, "JUnit"));
 
         assertTrue(ex.getMessage().contains("Nieprawidłowy"));
         verify(jwtTokenProvider, never()).generateToken(anyString());
+        verify(refreshTokenService, never()).issue(any(), any());
     }
 
 }
