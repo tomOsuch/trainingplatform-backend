@@ -22,6 +22,7 @@ import pl.tomaszosuch.trainingplatform_backend.exception.InvitationNotFoundExcep
 import pl.tomaszosuch.trainingplatform_backend.mapper.InvitationMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.RateLimiter;
 import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.InvitationServiceImpl;
 
@@ -57,6 +58,9 @@ public class InvitationServiceImplTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private RateLimiter rateLimiter;
+
     @Captor
     private ArgumentCaptor<Invitation> invitationCaptor;
 
@@ -81,7 +85,8 @@ public class InvitationServiceImplTest {
                 tokenGenerator,
                 invitationMapper,
                 emailService,
-                properties);
+                properties,
+                rateLimiter);
 
         admin = User.builder()
                 .id(1L)

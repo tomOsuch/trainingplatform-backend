@@ -32,10 +32,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.response.LoginResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.PasswordResetCheckResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
-import pl.tomaszosuch.trainingplatform_backend.exception.InvalidCredentialsException;
-import pl.tomaszosuch.trainingplatform_backend.exception.InvalidInvitationException;
-import pl.tomaszosuch.trainingplatform_backend.exception.InvalidPasswordResetTokenException;
-import pl.tomaszosuch.trainingplatform_backend.exception.InvalidRefreshTokenException;
+import pl.tomaszosuch.trainingplatform_backend.exception.*;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
 import pl.tomaszosuch.trainingplatform_backend.security.RefreshTokenCookieFactory;
 import pl.tomaszosuch.trainingplatform_backend.service.AuthService;
@@ -356,7 +353,7 @@ public class AuthControllerTest {
                                 new PasswordResetRequest("jan.kowalski@example.com"))))
                 .andExpect(status().isAccepted());
 
-        verify(passwordResetService).requestReset(any(PasswordResetRequest.class));
+        verify(passwordResetService).requestReset(any(PasswordResetRequest.class), any());
     }
 
     @Test
@@ -370,7 +367,7 @@ public class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.email").exists());
 
-        verify(passwordResetService, never()).requestReset(any(PasswordResetRequest.class));
+        verify(passwordResetService, never()).requestReset(any(PasswordResetRequest.class), any());
     }
 
     @Test
@@ -423,6 +420,24 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.errors.password").exists());
 
         verify(passwordResetService, never()).confirmReset(any(PasswordResetConfirmRequest.class));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 429 z nagłówkiem Retry-After po przekroczeniu limitu")
+    public void shouldReturn429WhenRateLimitExceeded() throws Exception {
+        // given
+        when(authService.login(any(LoginRequest.class), any()))
+                .thenThrow(new RateLimitExceededException(42));
+
+        // when & then
+        mockMvc.perform(post("/auth/login")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validLogin)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "42"))
+                .andExpect(jsonPath("$.status").value(429))
+                .andExpect(jsonPath("$.message").value("Zbyt wiele prób. Spróbuj ponownie za chwilę."));
     }
 
 }

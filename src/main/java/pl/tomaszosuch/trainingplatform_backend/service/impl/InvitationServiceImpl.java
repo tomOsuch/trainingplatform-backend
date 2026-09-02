@@ -17,6 +17,7 @@ import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.InvitationMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.RateLimiter;
 import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.service.EmailService;
 import pl.tomaszosuch.trainingplatform_backend.service.InvitationService;
@@ -36,9 +37,12 @@ public class InvitationServiceImpl implements InvitationService {
     private final InvitationMapper invitationMapper;
     private final EmailService emailService;
     private final InvitationProperties properties;
+    private final RateLimiter rateLimiter;
 
     @Override
     public InvitationResponse createInvitation(InvitationRequest request, Long invitedById) {
+
+        rateLimiter.checkInvitationCreation(invitedById);
 
         String email = request.email().trim();
 
