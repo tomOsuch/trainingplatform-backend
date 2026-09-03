@@ -25,6 +25,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.response.WorkoutCategoryRespo
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
 import pl.tomaszosuch.trainingplatform_backend.exception.WorkoutCategoryNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.WorkoutCategoryMapper;
+import pl.tomaszosuch.trainingplatform_backend.repository.GoalRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutCategoryRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutLogRepository;
@@ -48,6 +49,9 @@ public class WorkoutCategoryServiceImplTest {
 
     @Mock
     private WorkoutLogRepository workoutLogRepository;
+
+    @Mock
+    private GoalRepository goalRepository;
 
     private WorkoutCategory category;
     private WorkoutCategoryResponse categoryResponse;
@@ -278,6 +282,24 @@ public class WorkoutCategoryServiceImplTest {
                 () -> workoutCategoryService.deleteCategory(1L));
 
         assertTrue(ex.getMessage().contains("używana"));
+        verify(workoutCategoryRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("powinien rzucić wyjątek gdy kategoria jest używana przez cel")
+    void shouldThrowExceptionWhenUsedByGoal() {
+        // given
+        when(workoutCategoryRepository.findById(1L)).thenReturn(Optional.of(category));
+        when(trainingPlanRepository.existsByCategoryId(1L)).thenReturn(false);
+        when(workoutLogRepository.existsByCategoryId(1L)).thenReturn(false);
+        when(goalRepository.existsByCategoryId(1L)).thenReturn(true);
+
+        // when & then
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> workoutCategoryService.deleteCategory(1L));
+
+        assertTrue(ex.getMessage().contains("cele"));
         verify(workoutCategoryRepository, never()).delete(any());
     }
 
