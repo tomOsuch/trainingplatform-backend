@@ -8,9 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -21,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -39,6 +38,8 @@ import pl.tomaszosuch.trainingplatform_backend.exception.InvalidInvitationExcept
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.ClientInfo;
+import pl.tomaszosuch.trainingplatform_backend.security.RateLimiter;
 import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtTokenProvider;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AuthServiceImpl;
@@ -68,11 +69,15 @@ public class AuthServiceImplTest {
     @Mock
     private RefreshTokenService refreshTokenService;
 
+    @Mock
+    private RateLimiter rateLimiter;
+
     @InjectMocks
     private AuthServiceImpl authService;
 
     private static final String TOKEN = "jawny-token-zaproszenia";
     private static final String TOKEN_HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    private static final ClientInfo KLIENT = new ClientInfo("127.0.0.1", "JUnit");
 
     private RegisterRequest validRequest;
     private User savedUser;
@@ -342,11 +347,11 @@ public class AuthServiceImplTest {
             when(userRepository.findByEmail(loginRequest.email())).thenReturn(Optional.of(savedUser));
             when(passwordEncoder.matches(loginRequest.password(), savedUser.getPassword())).thenReturn(true);
             when(jwtTokenProvider.generateToken(savedUser.getEmail())).thenReturn("wygenerowany.jwt.token");
-            when(refreshTokenService.issue(savedUser, "JUnit")).thenReturn(
+            when(refreshTokenService.issue(savedUser, KLIENT)).thenReturn(
                     new RefreshTokenService.IssuedToken("surowy-refresh-token", LocalDateTime.now().plusDays(14)));
 
             // when
-            var result = authService.login(loginRequest, "JUnit");
+            var result = authService.login(loginRequest, KLIENT);
 
             // then
             assertNotNull(result);
@@ -371,10 +376,11 @@ public class AuthServiceImplTest {
             // when & then
             InvalidCredentialsException ex = assertThrows(
                     InvalidCredentialsException.class,
-                    () -> authService.login(loginRequest, "JUnit"));
+                    () -> authService.login(loginRequest, KLIENT));
 
             assertTrue(ex.getMessage().contains("Nieprawidłowy"));
             verify(jwtTokenProvider, never()).generateToken(anyString());
+            verify(rateLimiter).registerFailedLogin(loginRequest.email());
             verify(refreshTokenService, never()).issue(any(), any());
         }
 
@@ -393,10 +399,11 @@ public class AuthServiceImplTest {
         // when & then
         InvalidCredentialsException ex = assertThrows(
                 InvalidCredentialsException.class,
-                () -> authService.login(loginRequest, "JUnit"));
+                () -> authService.login(loginRequest, KLIENT));
 
         assertTrue(ex.getMessage().contains("Nieprawidłowy"));
         verify(jwtTokenProvider, never()).generateToken(anyString());
+        verify(rateLimiter).registerFailedLogin(loginRequest.email());
         verify(refreshTokenService, never()).issue(any(), any());
     }
 
@@ -423,11 +430,27 @@ public class AuthServiceImplTest {
         // when & then
         InvalidCredentialsException ex = assertThrows(
                 InvalidCredentialsException.class,
-                () -> authService.login(loginRequest, "JUnit"));
+                () -> authService.login(loginRequest, KLIENT));
 
         assertTrue(ex.getMessage().contains("Nieprawidłowy"));
         verify(jwtTokenProvider, never()).generateToken(anyString());
+        verify(rateLimiter).registerFailedLogin(loginRequest.email());
         verify(refreshTokenService, never()).issue(any(), any());
+    }
+
+    @Test
+    @DisplayName("sprawdza limit ZANIM sięgnie do bazy")
+    void shouldCheckRateLimitBeforeTouchingRepository() {
+        var loginRequest = new LoginRequest("jan.kowalski@example.com", "password");
+
+        when(userRepository.findByEmail(loginRequest.email())).thenReturn(Optional.empty());
+
+        assertThrows(InvalidCredentialsException.class,
+                () -> authService.login(loginRequest, KLIENT));
+
+        InOrder kolejnosc = inOrder(rateLimiter, userRepository);
+        kolejnosc.verify(rateLimiter).checkLoginAttempt(KLIENT.ip(), loginRequest.email());
+        kolejnosc.verify(userRepository).findByEmail(loginRequest.email());
     }
 
 }

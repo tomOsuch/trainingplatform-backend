@@ -17,3 +17,5 @@ app:
   refresh-token:
     cookie-secure: true
     cookie-same-site: Lax
+server:
+  forward-headers-strategy: framework

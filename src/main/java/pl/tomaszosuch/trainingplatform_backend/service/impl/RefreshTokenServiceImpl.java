@@ -10,6 +10,7 @@ import pl.tomaszosuch.trainingplatform_backend.entity.RefreshToken;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidRefreshTokenException;
 import pl.tomaszosuch.trainingplatform_backend.repository.RefreshTokenRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.ClientInfo;
 import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.service.RefreshTokenService;
 
@@ -29,14 +30,14 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     private final RefreshTokenRevoker refreshTokenRevoker;
 
     @Override
-    public IssuedToken issue(User user, String userAgent) {
-        NewToken created = createToken(user, userAgent);
+    public IssuedToken issue(User user, ClientInfo clientInfo) {
+        NewToken created = createToken(user, clientInfo);
         log.debug("Wydano token odświeżający dla użytkownika {}", user.getEmail());
         return new IssuedToken(created.rawToken(), created.entity().getExpiresAt());
     }
 
     @Override
-    public RotationResult rotate(String rawToken, String userAgent) {
+    public RotationResult rotate(String rawToken, ClientInfo clientInfo) {
         RefreshToken current = refreshTokenRepository
                 .findByTokenHashWithUser(tokenGenerator.hash(rawToken))
                 .orElseThrow(() -> new InvalidRefreshTokenException("Token odświeżający jest nieprawidłowy"));
@@ -55,7 +56,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
             throw new InvalidRefreshTokenException("Konto jest nieaktywne");
         }
 
-        NewToken created = createToken(user, userAgent);
+        NewToken created = createToken(user, clientInfo);
         current.setRevokedAt(LocalDateTime.now());
         current.setReplacedBy(created.entity());
 
@@ -93,14 +94,14 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         throw new InvalidRefreshTokenException("Sesja została unieważniona ze względów bezpieczeństwa");
     }
 
-    private NewToken createToken(User user, String userAgent) {
+    private NewToken createToken(User user, ClientInfo clientInfo) {
         String rawToken = tokenGenerator.generateToken();
 
         RefreshToken entity = RefreshToken.builder()
                 .tokenHash(tokenGenerator.hash(rawToken))
                 .user(user)
                 .expiresAt(LocalDateTime.now().plusDays(properties.getExpirationDays()))
-                .userAgent(truncate(userAgent))
+                .userAgent(truncate(clientInfo == null ? null : clientInfo.userAgent()))
                 .build();
 
         return new NewToken(refreshTokenRepository.save(entity), rawToken);

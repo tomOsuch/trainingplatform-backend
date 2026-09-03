@@ -32,3 +32,13 @@ app:
     cookie-path: /api/auth
     cookie-secure: false
     cookie-same-site: Lax
+  rate-limit:
+    enabled: false
+    login-per-ip: 20
+    login-per-account: 8
+    login-window: 15m
+    password-reset-per-email: 3
+    password-reset-per-ip: 10
+    password-reset-window: 60m
+    invitation-per-admin: 20
+    invitation-window: 60m

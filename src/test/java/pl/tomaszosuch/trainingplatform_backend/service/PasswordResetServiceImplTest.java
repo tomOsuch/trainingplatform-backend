@@ -21,6 +21,8 @@ import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidPasswordResetTokenException;
 import pl.tomaszosuch.trainingplatform_backend.repository.PasswordResetTokenRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.ClientInfo;
+import pl.tomaszosuch.trainingplatform_backend.security.RateLimiter;
 import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.PasswordResetServiceImpl;
 
@@ -36,6 +38,7 @@ import static org.mockito.Mockito.*;
 public class PasswordResetServiceImplTest {
 
     private static final String EMAIL = "jan.kowalski@example.com";
+    private static final ClientInfo KLIENT = new ClientInfo("127.0.0.1", "JUnit");
     private static final String PLAIN_TOKEN = "jawny-token-resetu_ABC123";
     private static final String TOKEN_HASH =
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -58,6 +61,9 @@ public class PasswordResetServiceImplTest {
 
     @Mock
     private RefreshTokenService refreshTokenService;
+
+    @Mock
+    private RateLimiter rateLimiter;
 
     @Captor
     private ArgumentCaptor<PasswordResetToken> tokenCaptor;
@@ -83,7 +89,8 @@ public class PasswordResetServiceImplTest {
                 passwordEncoder,
                 emailService,
                 properties,
-                refreshTokenService);
+                refreshTokenService,
+                rateLimiter);
 
         user = User.builder()
                 .id(4L)
@@ -120,7 +127,7 @@ public class PasswordResetServiceImplTest {
         public void shouldStoreOnlyTokenHash() {
             stubExistingAccount();
 
-            passwordResetService.requestReset(new PasswordResetRequest(EMAIL));
+            passwordResetService.requestReset(new PasswordResetRequest(EMAIL), KLIENT);
 
             verify(tokenRepository).save(tokenCaptor.capture());
             PasswordResetToken saved = tokenCaptor.getValue();
@@ -135,7 +142,7 @@ public class PasswordResetServiceImplTest {
         void shouldDeletePreviousTokensBeforeSaving() {
             stubExistingAccount();
 
-            passwordResetService.requestReset(new PasswordResetRequest(EMAIL));
+            passwordResetService.requestReset(new PasswordResetRequest(EMAIL), KLIENT);
 
             InOrder order = inOrder(tokenRepository);
             order.verify(tokenRepository).deleteByUserId(4L);
@@ -149,7 +156,7 @@ public class PasswordResetServiceImplTest {
             properties.setExpirationMinutes(5);
             stubExistingAccount();
 
-            passwordResetService.requestReset(new PasswordResetRequest(EMAIL));
+            passwordResetService.requestReset(new PasswordResetRequest(EMAIL), KLIENT);
 
             verify(tokenRepository).save(tokenCaptor.capture());
             LocalDateTime expiresAt = tokenCaptor.getValue().getExpiresAt();
@@ -163,7 +170,7 @@ public class PasswordResetServiceImplTest {
         void shouldSendLinkNotBareToken() {
             stubExistingAccount();
 
-            passwordResetService.requestReset(new PasswordResetRequest(EMAIL));
+            passwordResetService.requestReset(new PasswordResetRequest(EMAIL), KLIENT);
 
             verify(emailService).sendPasswordReset(
                     eq(EMAIL), urlCaptor.capture(), any(LocalDateTime.class));
@@ -179,11 +186,12 @@ public class PasswordResetServiceImplTest {
         void shouldDoNothingForUnknownEmail() {
             when(userRepository.findByEmail("nieznany@example.com")).thenReturn(Optional.empty());
 
-            passwordResetService.requestReset(new PasswordResetRequest("nieznany@example.com"));
+            passwordResetService.requestReset(new PasswordResetRequest("nieznany@example.com"), KLIENT);
 
             verify(tokenRepository, never()).save(any(PasswordResetToken.class));
             verify(tokenRepository, never()).deleteByUserId(anyLong());
             verify(emailService, never()).sendPasswordReset(anyString(), anyString(), any());
+            verify(rateLimiter).checkPasswordResetRequest(KLIENT.ip(), "nieznany@example.com");
         }
 
         @Test
@@ -191,7 +199,7 @@ public class PasswordResetServiceImplTest {
         void shouldTrimEmail() {
             stubExistingAccount();
 
-            passwordResetService.requestReset(new PasswordResetRequest("  " + EMAIL + "  "));
+            passwordResetService.requestReset(new PasswordResetRequest("  " + EMAIL + "  "), KLIENT);
 
             verify(tokenRepository).save(any(PasswordResetToken.class));
         }
@@ -203,7 +211,7 @@ public class PasswordResetServiceImplTest {
             doThrow(new RuntimeException("Serwer SMTP nie odpowiada"))
                     .when(emailService).sendPasswordReset(anyString(), anyString(), any());
 
-            passwordResetService.requestReset(new PasswordResetRequest(EMAIL));
+            passwordResetService.requestReset(new PasswordResetRequest(EMAIL), KLIENT);
 
             verify(tokenRepository).save(any(PasswordResetToken.class));
         }

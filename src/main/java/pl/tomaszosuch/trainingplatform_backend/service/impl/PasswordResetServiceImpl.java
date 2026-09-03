@@ -15,6 +15,8 @@ import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.exception.InvalidPasswordResetTokenException;
 import pl.tomaszosuch.trainingplatform_backend.repository.PasswordResetTokenRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.ClientInfo;
+import pl.tomaszosuch.trainingplatform_backend.security.RateLimiter;
 import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.service.EmailService;
 import pl.tomaszosuch.trainingplatform_backend.service.PasswordResetService;
@@ -35,16 +37,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     private final EmailService emailService;
     private final PasswordResetProperties properties;
     private final RefreshTokenService refreshTokenService;
-
-    @Override
-    public void requestReset(PasswordResetRequest request) {
-        String email = request.email().trim();
-
-        userRepository.findByEmail(email).ifPresentOrElse(
-                this::issueToken,
-                () -> log.info("Żądanie resetu hasła dla adresu bez konta: {}", email)
-        );
-    }
+    private final RateLimiter rateLimiter;
 
     @Override
     @Transactional(readOnly = true)
@@ -72,6 +65,18 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         refreshTokenService.revokeAllForUser(userId);
 
         log.info("Hasło konta {} zostało zresetowane — unieważniono wszystkie sesje", email);
+    }
+
+    @Override
+    public void requestReset(PasswordResetRequest request, ClientInfo clientInfo) {
+        String email = request.email().trim();
+
+        rateLimiter.checkPasswordResetRequest(clientInfo.ip(), email);
+
+        userRepository.findByEmail(email).ifPresentOrElse(
+                this::issueToken,
+                () -> log.info("Żądanie resetu hasła dla adresu bez konta: {}", email)
+        );
     }
 
     private void issueToken(User user) {

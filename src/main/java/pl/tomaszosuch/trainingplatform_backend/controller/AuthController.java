@@ -1,5 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -15,6 +16,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.response.InvitationCheckRespo
 import pl.tomaszosuch.trainingplatform_backend.dto.response.LoginResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.PasswordResetCheckResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
+import pl.tomaszosuch.trainingplatform_backend.security.ClientInfo;
 import pl.tomaszosuch.trainingplatform_backend.security.RefreshTokenCookieFactory;
 import pl.tomaszosuch.trainingplatform_backend.service.AuthService;
 import pl.tomaszosuch.trainingplatform_backend.service.PasswordResetService;
@@ -35,9 +37,11 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request,
-                                   @RequestHeader(value = HttpHeaders.USER_AGENT, required = false ) String userAgent) {
-        AuthService.LoginResult result = authService.login(request, userAgent);
+    public ResponseEntity<LoginResponse> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+
+        AuthService.LoginResult result = authService.login(request, ClientInfo.from(httpRequest));
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookieFactory.create(result.refreshToken()).toString())
@@ -47,9 +51,9 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refresh(
             @CookieValue(name = "${app.refresh-token.cookie-name}", required = false) String refreshToken,
-            @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
+            HttpServletRequest httpRequest) {
 
-        AuthService.LoginResult result = authService.refresh(refreshToken, userAgent);
+        AuthService.LoginResult result = authService.refresh(refreshToken, ClientInfo.from(httpRequest));
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookieFactory.create(result.refreshToken()).toString())
@@ -73,8 +77,11 @@ public class AuthController {
     }
 
     @PostMapping("/password-reset")
-    public ResponseEntity<?> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
-        passwordResetService.requestReset(request);
+    public ResponseEntity<?> resetPassword(
+            @Valid @RequestBody PasswordResetRequest request,
+            HttpServletRequest httpRequest) {
+
+        passwordResetService.requestReset(request, ClientInfo.from(httpRequest));
         return ResponseEntity.accepted().build();
     }
 

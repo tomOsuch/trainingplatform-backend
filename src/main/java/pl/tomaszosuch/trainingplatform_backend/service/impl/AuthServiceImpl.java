@@ -22,6 +22,8 @@ import pl.tomaszosuch.trainingplatform_backend.exception.InvalidRefreshTokenExce
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.ClientInfo;
+import pl.tomaszosuch.trainingplatform_backend.security.RateLimiter;
 import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtTokenProvider;
 import pl.tomaszosuch.trainingplatform_backend.service.AuthService;
@@ -42,6 +44,7 @@ public class AuthServiceImpl implements AuthService {
     private final InvitationRepository invitationRepository;
     private final SecureTokenGenerator invitationTokenGenerator;
     private final RefreshTokenService refreshTokenService;
+    private final RateLimiter rateLimiter;
 
     @Override
     public UserResponse register(RegisterRequest request) {
@@ -82,35 +85,6 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public LoginResult login(LoginRequest request, String userAgent) {
-
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(InvalidCredentialsException::new);
-
-        if (!Boolean.TRUE.equals(user.getIsActive())) {
-            throw new InvalidCredentialsException();
-        }
-
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new InvalidCredentialsException();
-        }
-
-        return buildLoginResult(user, refreshTokenService.issue(user, userAgent));
-    }
-
-    @Override
-    public LoginResult refresh(String rawRefreshToken, String userAgent) {
-
-        if (!StringUtils.hasText(rawRefreshToken)) {
-            throw new InvalidRefreshTokenException("Brak tokena odświeżającego");
-        }
-
-        RefreshTokenService.RotationResult rotation = refreshTokenService.rotate(rawRefreshToken, userAgent);
-
-        return buildLoginResult(rotation.user(), rotation.refreshToken());
-    }
-
-    @Override
     public void logout(String rawRefreshToken) {
 
         if (StringUtils.hasText(rawRefreshToken)) {
@@ -136,6 +110,44 @@ public class AuthServiceImpl implements AuthService {
     public InvitationCheckResponse checkInvitation(String token) {
         Invitation invitation = requireUsableInvitation(token);
         return new InvitationCheckResponse(invitation.getEmail(), invitation.getExpiresAt());
+    }
+
+    @Override
+    public LoginResult login(LoginRequest request, ClientInfo clientInfo) {
+
+        rateLimiter.checkLoginAttempt(clientInfo.ip(), request.email());
+
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> rejectLogin(request.email()));
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw rejectLogin(request.email());
+        }
+
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw rejectLogin(request.email());
+        }
+
+        return buildLoginResult(user, refreshTokenService.issue(user, clientInfo));
+    }
+
+    //TODO do zmiany nazwa metody
+    private InvalidCredentialsException rejectLogin(String email) {
+        rateLimiter.registerFailedLogin(email);
+        return new InvalidCredentialsException();
+    }
+
+    @Override
+    public LoginResult refresh(String rawRefreshToken, ClientInfo clientInfo) {
+
+        if (!StringUtils.hasText(rawRefreshToken)) {
+            throw new InvalidRefreshTokenException("Brak tokena odświeżającego");
+        }
+
+        RefreshTokenService.RotationResult rotation =
+                refreshTokenService.rotate(rawRefreshToken, clientInfo);
+
+        return buildLoginResult(rotation.user(), rotation.refreshToken());
     }
 
     private Invitation requireUsableInvitation(String token) {
