@@ -112,7 +112,7 @@ public class WorkoutCategoryControllerTest {
                 .with(csrf())
                 .contentType("application/json")
                 .content(new ObjectMapper().writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.name").value("Taniec"))
                 .andExpect(jsonPath("$.color").value("#9B59B6"))

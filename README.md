@@ -345,6 +345,8 @@ Dołączona jest kolekcja **Postman** (`trainingplatform.postman_collection.json
 | `PUT` | `/workout-categories/{id}` | Edycja kategorii | ADMIN |
 | `DELETE` | `/workout-categories/{id}` | Usunięcie kategorii | ADMIN |
 
+> `POST /workout-categories` zwraca `201 Created`. Endpoint jest dostępny wyłącznie dla roli ADMIN; kategorie startowe zakłada `DataInitializer` przy pierwszym uruchomieniu.
+
 ### Plany treningowe (`/training-plans`)
 
 | Metoda | Endpoint | Opis | Dostęp |

@@ -2,6 +2,7 @@ package pl.tomaszosuch.trainingplatform_backend.controller;
 
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -41,7 +42,7 @@ public class WorkoutCategoryController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<WorkoutCategoryResponse> createCategory(@Valid @RequestBody WorkoutCategoryRequest request) {
-        return ResponseEntity.ok(workoutCategoryService.createCategory(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(workoutCategoryService.createCategory(request));
     }
 
     @PutMapping("/{id}")
