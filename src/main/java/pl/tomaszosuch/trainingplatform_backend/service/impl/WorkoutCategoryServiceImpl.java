@@ -11,6 +11,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.response.WorkoutCategoryRespo
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
 import pl.tomaszosuch.trainingplatform_backend.exception.WorkoutCategoryNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.WorkoutCategoryMapper;
+import pl.tomaszosuch.trainingplatform_backend.repository.GoalRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutCategoryRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutLogRepository;
@@ -20,52 +21,53 @@ import pl.tomaszosuch.trainingplatform_backend.service.WorkoutCategoryService;
 @RequiredArgsConstructor
 @Transactional
 public class WorkoutCategoryServiceImpl implements WorkoutCategoryService {
-    
+
     private final WorkoutCategoryRepository workoutCategoryRepository;
     private final WorkoutCategoryMapper workoutCategoryMapper;
     private final TrainingPlanRepository trainingPlanRepository;
     private final WorkoutLogRepository workoutLogRepository;
-    
+    private final GoalRepository goalRepository;
+
     @Override
-    @Transactional(readOnly = true)  
+    @Transactional(readOnly = true)
     public List<WorkoutCategoryResponse> getAllCategories() {
-        
+
         return workoutCategoryRepository.findAll().stream()
-            .map(workoutCategoryMapper::toResponse)
-            .toList();
+                .map(workoutCategoryMapper::toResponse)
+                .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public WorkoutCategoryResponse getCategoryById(Long id) {
         return workoutCategoryRepository.findById(id)
-            .map(workoutCategoryMapper::toResponse)
-            .orElseThrow(() -> new WorkoutCategoryNotFoundException(id));
+                .map(workoutCategoryMapper::toResponse)
+                .orElseThrow(() -> new WorkoutCategoryNotFoundException(id));
     }
 
     @Override
     @Transactional(readOnly = true)
     public WorkoutCategoryResponse getCategoryByName(String name) {
-        
+
         return workoutCategoryRepository.findAll().stream()
-            .filter(category -> category.getName().equalsIgnoreCase(name))
-            .findFirst()
-            .map(workoutCategoryMapper::toResponse)
-            .orElseThrow(() -> new WorkoutCategoryNotFoundException(name));
+                .filter(category -> category.getName().equalsIgnoreCase(name))
+                .findFirst()
+                .map(workoutCategoryMapper::toResponse)
+                .orElseThrow(() -> new WorkoutCategoryNotFoundException(name));
     }
 
     @Override
     public WorkoutCategoryResponse createCategory(WorkoutCategoryRequest request) {
-        
+
         if (workoutCategoryRepository.existsByName(request.name())) {
             throw new IllegalArgumentException("Kategoria treningu o nazwie " + request.name() + " już istnieje");
         }
 
         var category = new WorkoutCategory().builder()
-            .name(request.name())
-            .color(request.color())
-            .iconName(request.iconName())
-            .build();
+                .name(request.name())
+                .color(request.color())
+                .iconName(request.iconName())
+                .build();
 
         return workoutCategoryMapper.toResponse(workoutCategoryRepository.save(category));
     }
@@ -73,7 +75,7 @@ public class WorkoutCategoryServiceImpl implements WorkoutCategoryService {
     @Override
     public WorkoutCategoryResponse updateCategory(Long id, WorkoutCategoryRequest request) {
         var category = workoutCategoryRepository.findById(id)
-            .orElseThrow(() -> new WorkoutCategoryNotFoundException(id));
+                .orElseThrow(() -> new WorkoutCategoryNotFoundException(id));
 
         if (!category.getName().equalsIgnoreCase(request.name()) && workoutCategoryRepository.existsByName(request.name())) {
             throw new IllegalArgumentException("Kategoria treningu o nazwie " + request.name() + " już istnieje");
@@ -92,7 +94,12 @@ public class WorkoutCategoryServiceImpl implements WorkoutCategoryService {
 
         if (trainingPlanRepository.existsByCategoryId(id) || workoutLogRepository.existsByCategoryId(id)) {
             throw new IllegalArgumentException(
-                "Nie można usunąć kategorii, która jest używana przez treningi");
+                    "Nie można usunąć kategorii, która jest używana przez treningi");
+        }
+
+        if (goalRepository.existsByCategoryId(id)) {
+            throw new IllegalArgumentException(
+                    "Nie można usunąć kategorii, która jest używana przez cele");
         }
 
         workoutCategoryRepository.delete(category);
