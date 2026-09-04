@@ -18,6 +18,7 @@ public record GoalResponse(
         LocalDate endDate,
         long currentValue,
         int percent,
+        boolean targetReached,
         boolean achieved,
         LocalDateTime achievedAt
 ) {

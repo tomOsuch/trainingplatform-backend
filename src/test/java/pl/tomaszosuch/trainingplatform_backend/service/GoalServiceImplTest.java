@@ -1,5 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.service;
 
+import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -28,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalStatusUpdateRequest;
 import pl.tomaszosuch.trainingplatform_backend.entity.Goal;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
@@ -188,7 +190,7 @@ class GoalServiceImplTest {
 
     @Test
     @DisplayName("edycja bez daty początkowej zachowuje dotychczasową, nie przesuwa na dziś")
-    void shouldKeepStartDateOnUpdateWhenNotProvided() throws java.nio.file.AccessDeniedException {
+    void shouldKeepStartDateOnUpdateWhenNotProvided() {
         when(goalRepository.findById(10L)).thenReturn(Optional.of(goal));
         when(workoutCategoryRepository.findById(5L)).thenReturn(Optional.of(category));
         when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -216,12 +218,65 @@ class GoalServiceImplTest {
 
     @Test
     @DisplayName("usunięcie własnego celu deleguje do repozytorium")
-    void shouldDeleteOwnGoal() throws java.nio.file.AccessDeniedException {
+    void shouldDeleteOwnGoal() {
         when(goalRepository.findById(10L)).thenReturn(Optional.of(goal));
 
         service.deleteGoal(1L, 10L);
 
         verify(goalRepository).delete(goal);
+    }
+
+    @Test
+    @DisplayName("oznaczenie jako osiągnięty zapisuje migawkę z aktualnego postępu")
+    void shouldFreezeProgressWhenMarkedAchieved() {
+        when(goalRepository.findById(10L)).thenReturn(Optional.of(goal));
+        when(goalProgressService.progressOf(goal)).thenReturn(new GoalProgress(4321, 6000));
+        when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.changeStatus(1L, 10L, new GoalStatusUpdateRequest(GoalStatus.ACHIEVED));
+
+        assertEquals(4321, goal.getAchievedValue());
+        assertNotNull(goal.getAchievedAt());
+    }
+
+    @Test
+    @DisplayName("ponowne oznaczenie osiągniętego celu nie nadpisuje migawki")
+    void shouldNotOverwriteSnapshotWhenAlreadyAchieved() {
+        goal.setAchievedAt(LocalDateTime.of(2026, 6, 1, 12, 0));
+        goal.setAchievedValue(6000);
+        when(goalRepository.findById(10L)).thenReturn(Optional.of(goal));
+        when(goalProgressService.progressOf(goal)).thenReturn(new GoalProgress(6000, 6000));
+        when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.changeStatus(1L, 10L, new GoalStatusUpdateRequest(GoalStatus.ACHIEVED));
+
+        assertEquals(6000, goal.getAchievedValue());
+        assertEquals(LocalDateTime.of(2026, 6, 1, 12, 0), goal.getAchievedAt());
+    }
+
+    @Test
+    @DisplayName("cofnięcie czyści migawkę i datę osiągnięcia")
+    void shouldClearSnapshotWhenReverted() {
+        goal.setAchievedAt(LocalDateTime.now());
+        goal.setAchievedValue(6000);
+        when(goalRepository.findById(10L)).thenReturn(Optional.of(goal));
+        when(goalProgressService.progressOf(goal)).thenReturn(new GoalProgress(6100, 6000));
+        when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.changeStatus(1L, 10L, new GoalStatusUpdateRequest(GoalStatus.ACTIVE));
+
+        assertNull(goal.getAchievedAt());
+        assertNull(goal.getAchievedValue());
+    }
+
+    @Test
+    @DisplayName("zmiana statusu cudzego celu kończy się odmową")
+    void shouldDenyStatusChangeOfForeignGoal() {
+        when(goalRepository.findById(10L)).thenReturn(Optional.of(goal));
+
+        assertThrows(AccessDeniedException.class,
+                () -> service.changeStatus(stranger.getId(), 10L, new GoalStatusUpdateRequest(GoalStatus.ACHIEVED)));
+        verify(goalRepository, never()).save(any());
     }
 
 }

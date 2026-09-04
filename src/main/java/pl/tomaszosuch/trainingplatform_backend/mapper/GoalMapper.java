@@ -16,6 +16,7 @@ public interface GoalMapper {
     @Mapping(target = "categoryColor", source = "goal.category.color")
     @Mapping(target = "currentValue", source = "progress.currentValue")
     @Mapping(target = "percent", expression = "java(progress.percent())")
+    @Mapping(target = "targetReached", expression = "java(progress.targetReached())")
     @Mapping(target = "achieved", source = "goal.achieved")
     GoalResponse toResponse(Goal goal, GoalProgress progress);
 }

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalStatusUpdateRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.Goal;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
@@ -22,6 +23,7 @@ import pl.tomaszosuch.trainingplatform_backend.service.model.GoalProgress;
 
 import org.springframework.security.access.AccessDeniedException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -81,7 +83,7 @@ public class GoalServiceImpl implements GoalService {
     }
 
     @Override
-    public GoalResponse updateGoal(Long userId, Long goalId, GoalRequest request) throws AccessDeniedException {
+    public GoalResponse updateGoal(Long userId, Long goalId, GoalRequest request) {
         Goal goal = findOwnedGoal(goalId, userId);
 
         if (goal.isAchieved()) {
@@ -104,14 +106,39 @@ public class GoalServiceImpl implements GoalService {
     }
 
     @Override
-    public void deleteGoal(Long userId, Long goalId) throws AccessDeniedException {
+    public GoalResponse changeStatus(Long userId, Long goalId, GoalStatusUpdateRequest request) {
+        Goal goal = findOwnedGoal(goalId, userId);
+
+        switch (request.status()) {
+            case ACHIEVED -> {
+                // Ponowne oznaczenie nadpisałoby migawkę żywą wartością — a migawka ma być
+                // zamrożona (US-019). Cel już osiągnięty zostawiamy bez zmian.
+                if (!goal.isAchieved()) {
+                    GoalProgress progress = goalProgressService.progressOf(goal);
+                    goal.setAchievedValue(Math.toIntExact(progress.currentValue()));
+                    goal.setAchievedAt(LocalDateTime.now());
+                }
+            }
+            case ACTIVE -> {
+                goal.setAchievedAt(null);
+                goal.setAchievedValue(null);
+            }
+        }
+
+        Goal saved = goalRepository.save(goal);
+        return goalMapper.toResponse(saved, goalProgressService.progressOf(saved));
+    }
+
+    @Override
+    public void deleteGoal(Long userId, Long goalId) {
         goalRepository.delete(findOwnedGoal(goalId, userId));
     }
 
-    private Goal findOwnedGoal(Long goalId, Long userId) throws AccessDeniedException {
+    private Goal findOwnedGoal(Long goalId, Long userId) {
         Goal goal = goalRepository.findById(goalId)
                 .orElseThrow(() -> new GoalNotFoundException(goalId));
 
+        // BR-05: każdy widzi wyłącznie własne cele. Odmowa, nie 404 — spójnie z planami.
         if (!goal.getUser().getId().equals(userId)) {
             throw new AccessDeniedException("Brak uprawnień do tego celu");
         }

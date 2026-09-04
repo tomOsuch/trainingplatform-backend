@@ -9,10 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,6 +36,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalStatusUpdateRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalMetric;
@@ -87,7 +85,7 @@ class GoalControllerTest {
         goalResponse = new GoalResponse(
                 10L, "100 godzin tańca", null, 5L, "Taniec", "#9B59B6",
                 GoalMetric.MINUTES, 6000, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
-                1500L, 25, false, null);
+                1500L, 25, false, false, null);
 
         validRequest = new GoalRequest(
                 "100 godzin tańca", null, 5L, GoalMetric.MINUTES, 6000,
@@ -226,6 +224,61 @@ class GoalControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("PATCH /goals/{id}/status zwraca 200 z celem po zmianie")
+    void shouldReturn200WhenStatusChanged() throws Exception {
+        when(goalService.changeStatus(eq(1L), eq(10L), any(GoalStatusUpdateRequest.class)))
+                .thenReturn(goalResponse);
+
+        mockMvc.perform(patch("/goals/10/status")
+                        .with(user(currentUser)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new GoalStatusUpdateRequest(GoalStatus.ACHIEVED))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(10));
+    }
+
+    @Test
+    @DisplayName("PATCH /goals/{id}/status bez statusu zwraca 400")
+    void shouldReturn400WhenStatusMissing() throws Exception {
+        mockMvc.perform(patch("/goals/10/status")
+                        .with(user(currentUser)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.status").exists());
+
+        verify(goalService, never()).changeStatus(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("PATCH /goals/{id}/status cudzego celu zwraca 403")
+    void shouldReturn403WhenChangingStatusOfForeignGoal() throws Exception {
+        when(goalService.changeStatus(eq(1L), eq(10L), any(GoalStatusUpdateRequest.class)))
+                .thenThrow(new AccessDeniedException("Brak uprawnień do tego celu"));
+
+        mockMvc.perform(patch("/goals/10/status")
+                        .with(user(currentUser)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new GoalStatusUpdateRequest(GoalStatus.ACHIEVED))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("odpowiedź zawiera wyliczoną flagę targetReached")
+    void shouldExposeTargetReachedFlag() throws Exception {
+        GoalResponse reached = new GoalResponse(
+                10L, "100 godzin tańca", null, 5L, "Taniec", "#9B59B6",
+                GoalMetric.MINUTES, 6000, LocalDate.of(2026, 1, 1), null,
+                6100L, 100, true, false, null);
+        when(goalService.getGoals(eq(1L), isNull())).thenReturn(List.of(reached));
+
+        mockMvc.perform(get("/goals").with(user(currentUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].targetReached").value(true))
+                .andExpect(jsonPath("$[0].achieved").value(false));
     }
 
 }
