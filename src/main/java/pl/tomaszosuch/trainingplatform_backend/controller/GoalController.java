@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalStatusUpdateRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalStatus;
@@ -44,6 +45,14 @@ public class GoalController {
             @PathVariable Long id,
             @Valid @RequestBody GoalRequest request) throws AccessDeniedException {
         return ResponseEntity.ok(goalService.updateGoal(currentUser.getId(), id, request));
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<GoalResponse> changeStatus(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable Long id,
+            @Valid @RequestBody GoalStatusUpdateRequest request) {
+        return ResponseEntity.ok(goalService.changeStatus(currentUser.getId(), id, request));
     }
 
     @DeleteMapping("/{id}")

@@ -1,6 +1,7 @@
 package pl.tomaszosuch.trainingplatform_backend.service;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalStatusUpdateRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalResponse;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalStatus;
 
@@ -13,7 +14,9 @@ public interface GoalService {
 
     GoalResponse createGoal(Long userId, GoalRequest request);
 
-    GoalResponse updateGoal(Long userId, Long goalId, GoalRequest request) throws AccessDeniedException;
+    GoalResponse updateGoal(Long userId, Long goalId, GoalRequest request);
 
-    void deleteGoal(Long userId, Long goalId) throws AccessDeniedException;
+    GoalResponse changeStatus(Long userId, Long goalId, GoalStatusUpdateRequest request);
+
+    void deleteGoal(Long userId, Long goalId);
 }
