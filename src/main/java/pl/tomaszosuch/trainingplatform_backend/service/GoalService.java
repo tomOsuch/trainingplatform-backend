@@ -2,6 +2,7 @@ package pl.tomaszosuch.trainingplatform_backend.service;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalStatusUpdateRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalDetailsResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalResponse;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalStatus;
 
@@ -11,6 +12,8 @@ import java.util.List;
 public interface GoalService {
 
     List<GoalResponse> getGoals(Long userId, GoalStatus status);
+
+    GoalDetailsResponse getGoal(Long userId, Long goalId);
 
     GoalResponse createGoal(Long userId, GoalRequest request);
 

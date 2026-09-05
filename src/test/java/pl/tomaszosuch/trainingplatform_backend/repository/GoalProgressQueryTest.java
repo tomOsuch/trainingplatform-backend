@@ -3,8 +3,10 @@ package pl.tomaszosuch.trainingplatform_backend.repository;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -27,6 +29,7 @@ import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutLog;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalMetric;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
+import pl.tomaszosuch.trainingplatform_backend.repository.specification.WorkoutLogSpecifications;
 
 @Testcontainers
 @DataJpaTest
@@ -43,6 +46,9 @@ class GoalProgressQueryTest {
 
     @Autowired
     private GoalRepository goalRepository;
+
+    @Autowired
+    private WorkoutLogRepository workoutLogRepository;
 
     private User user;
     private User otherUser;
@@ -164,15 +170,64 @@ class GoalProgressQueryTest {
     }
 
     @Test
-    @DisplayName("cel osiągnięty nie pojawia się w zapytaniu listowym, ale jest w zapytaniu po id")
-    void shouldExcludeAchievedGoalsFromListQuery() {
-        Goal achieved = goal(user, null, GoalMetric.SESSIONS, LocalDate.of(2026, 1, 1), null);
-        achieved.setAchievedAt(java.time.LocalDateTime.now());
-        achieved.setAchievedValue(3);
-        log(user, dance, LocalDate.of(2026, 2, 1), 60);
+    @DisplayName("specyfikacja i zapytanie listowe dają ten sam wynik")
+    void shouldKeepSpecificationAndListQueryEquivalent() {
+        Goal danceInMarch = goal(user, dance, GoalMetric.MINUTES,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+        Goal anythingOpen = goal(user, null, GoalMetric.SESSIONS, LocalDate.of(2026, 1, 1), null);
+        log(user, dance, LocalDate.of(2026, 2, 28), 60);   // przed oknem pierwszego celu
+        log(user, dance, LocalDate.of(2026, 3, 10), 45);
+        log(user, gym, LocalDate.of(2026, 3, 12), 30);     // inna kategoria
+        log(user, dance, LocalDate.of(2026, 3, 31), null); // bez czasu trwania
+        log(otherUser, dance, LocalDate.of(2026, 3, 15), 90);
 
-        assertEquals(List.of(), goalRepository.findActiveProgressByUserId(user.getId()));
-        assertEquals(1L, goalRepository.findProgressByGoalId(achieved.getId()).orElseThrow().getSessions());
+        Map<Long, GoalProgressView> rows = progressOf(user);
+
+        for (Goal g : List.of(danceInMarch, anythingOpen)) {
+            List<WorkoutLog> matched = workoutLogRepository.findAll(WorkoutLogSpecifications.matchingGoal(g));
+            long minutes = matched.stream()
+                    .map(WorkoutLog::getDurationMin)
+                    .filter(Objects::nonNull)
+                    .mapToLong(Integer::longValue)
+                    .sum();
+
+            assertEquals(rows.get(g.getId()).getSessions(), (long) matched.size(), "sesje celu " + g.getId());
+            assertEquals(rows.get(g.getId()).getMinutes(), minutes, "minuty celu " + g.getId());
+        }
+    }
+
+    @Test
+    @DisplayName("cel osiągnięty listuje tylko wpisy istniejące w chwili oznaczenia")
+    void shouldListOnlyLogsExistingAtAchievementForAchievedGoal() {
+        Goal g = goal(user, null, GoalMetric.SESSIONS, LocalDate.of(2026, 1, 1), null);
+        log(user, dance, LocalDate.of(2026, 2, 1), 60);   // istniał przed osiągnięciem
+        log(user, dance, LocalDate.of(2026, 1, 15), 60);  // dopisany później, z datą wsteczną
+        em.flush();
+
+        LocalDateTime achievedAt = LocalDateTime.of(2026, 3, 1, 12, 0);
+        g.setAchievedAt(achievedAt);
+        g.setAchievedValue(1);
+        em.flush();
+
+        // created_at jest updatable = false, więc ani dirty checking, ani JPQL go nie ruszą —
+        // ustawiamy wprost w bazie, żeby odtworzyć wpis dodany po zamknięciu celu.
+        setCreatedAt(LocalDate.of(2026, 2, 1), achievedAt.minusDays(1));
+        setCreatedAt(LocalDate.of(2026, 1, 15), achievedAt.plusDays(1));
+        em.clear();
+
+        Goal reloaded = goalRepository.findById(g.getId()).orElseThrow();
+        List<WorkoutLog> matched = workoutLogRepository.findAll(WorkoutLogSpecifications.matchingGoal(reloaded));
+
+        assertEquals(1, matched.size());
+        assertEquals(LocalDate.of(2026, 2, 1), matched.get(0).getPerformedDate());
+    }
+
+    private void setCreatedAt(LocalDate performedDate, LocalDateTime createdAt) {
+        em.getEntityManager()
+                .createNativeQuery("UPDATE workout_log SET created_at = ?1 WHERE performed_date = ?2")
+                .setParameter(1, createdAt)
+                .setParameter(2, performedDate)
+                .executeUpdate();
     }
 
 }

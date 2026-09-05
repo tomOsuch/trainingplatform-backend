@@ -374,7 +374,7 @@ public class WorkoutLogServiceImplTest {
         assertThrows(AccessDeniedException.class,
                 () -> workoutLogService.delete(OTHER_USER_ID, LOG_ID));
 
-        verify(workoutLogRepository, never()).delete(any());
+        verify(workoutLogRepository, never()).delete(any(WorkoutLog.class));
     }
 
     @Test
@@ -399,7 +399,7 @@ public class WorkoutLogServiceImplTest {
         assertThrows(WorkoutLogNotFoundException.class,
                 () -> workoutLogService.delete(OWNER_ID, LOG_ID));
 
-        verify(workoutLogRepository, never()).delete(any());
+        verify(workoutLogRepository, never()).delete(any(WorkoutLog.class));
     }
 
     @Test

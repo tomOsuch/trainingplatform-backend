@@ -37,6 +37,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalStatusUpdateRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalDetailsResponse;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalLogEntryResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalMetric;
@@ -279,6 +281,41 @@ class GoalControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].targetReached").value(true))
                 .andExpect(jsonPath("$[0].achieved").value(false));
+    }
+
+    @Test
+    @DisplayName("GET /goals/{id} zwraca 200 z celem i wliczonymi wpisami")
+    void shouldReturn200WithGoalDetails() throws Exception {
+        GoalDetailsResponse details = new GoalDetailsResponse(goalResponse, List.of(
+                new GoalLogEntryResponse(31L, "Salsa", LocalDate.of(2026, 3, 10), 60, 5L, "Taniec", "#9B59B6"),
+                new GoalLogEntryResponse(30L, null, LocalDate.of(2026, 3, 1), 45, 5L, "Taniec", "#9B59B6")));
+        when(goalService.getGoal(1L, 10L)).thenReturn(details);
+
+        mockMvc.perform(get("/goals/10").with(user(currentUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.goal.id").value(10))
+                .andExpect(jsonPath("$.goal.currentValue").value(1500))
+                .andExpect(jsonPath("$.entries.length()").value(2))
+                .andExpect(jsonPath("$.entries[0].id").value(31))
+                .andExpect(jsonPath("$.entries[0].categoryName").value("Taniec"));
+    }
+
+    @Test
+    @DisplayName("GET /goals/{id} cudzego celu zwraca 403")
+    void shouldReturn403WhenReadingForeignGoal() throws Exception {
+        when(goalService.getGoal(1L, 10L)).thenThrow(new AccessDeniedException("Brak uprawnień do tego celu"));
+
+        mockMvc.perform(get("/goals/10").with(user(currentUser)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /goals/{id} nieistniejącego celu zwraca 404")
+    void shouldReturn404WhenReadingMissingGoal() throws Exception {
+        when(goalService.getGoal(1L, 99L)).thenThrow(new GoalNotFoundException(99L));
+
+        mockMvc.perform(get("/goals/99").with(user(currentUser)))
+                .andExpect(status().isNotFound());
     }
 
 }

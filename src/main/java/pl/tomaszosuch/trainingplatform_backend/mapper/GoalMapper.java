@@ -2,8 +2,10 @@ package pl.tomaszosuch.trainingplatform_backend.mapper;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalLogEntryResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.Goal;
+import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutLog;
 import pl.tomaszosuch.trainingplatform_backend.service.model.GoalProgress;
 
 @Mapper(componentModel = "spring")
@@ -19,4 +21,9 @@ public interface GoalMapper {
     @Mapping(target = "targetReached", expression = "java(progress.targetReached())")
     @Mapping(target = "achieved", source = "goal.achieved")
     GoalResponse toResponse(Goal goal, GoalProgress progress);
+
+    @Mapping(target = "categoryId", source = "category.id")
+    @Mapping(target = "categoryName", source = "category.name")
+    @Mapping(target = "categoryColor", source = "category.color")
+    GoalLogEntryResponse toLogEntry(WorkoutLog log);
 }
