@@ -33,6 +33,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalStatusUpdateReque
 import pl.tomaszosuch.trainingplatform_backend.entity.Goal;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
+import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutLog;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalMetric;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
@@ -277,6 +278,32 @@ class GoalServiceImplTest {
         assertThrows(AccessDeniedException.class,
                 () -> service.changeStatus(stranger.getId(), 10L, new GoalStatusUpdateRequest(GoalStatus.ACHIEVED)));
         verify(goalRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("szczegóły celu: lista wpisów i postęp z tej samej listy")
+    void shouldBuildDetailsFromSingleLogList() {
+        List<WorkoutLog> logs = List.of(WorkoutLog.builder().id(31L).build(), WorkoutLog.builder().id(30L).build());
+        GoalProgress progress = new GoalProgress(105, 6000);
+        when(goalRepository.findById(10L)).thenReturn(Optional.of(goal));
+        when(goalProgressService.matchingLogs(goal)).thenReturn(logs);
+        when(goalProgressService.progressOf(goal, logs)).thenReturn(progress);
+
+        service.getGoal(1L, 10L);
+
+        verify(goalMapper).toResponse(goal, progress);
+        verify(goalMapper).toLogEntry(logs.get(0));
+        verify(goalMapper).toLogEntry(logs.get(1));
+        verify(goalProgressService, never()).progressOf(goal);
+    }
+
+    @Test
+    @DisplayName("szczegóły cudzego celu kończą się odmową")
+    void shouldDenyDetailsOfForeignGoal() {
+        when(goalRepository.findById(10L)).thenReturn(Optional.of(goal));
+
+        assertThrows(AccessDeniedException.class, () -> service.getGoal(stranger.getId(), 10L));
+        verify(goalProgressService, never()).matchingLogs(any());
     }
 
 }

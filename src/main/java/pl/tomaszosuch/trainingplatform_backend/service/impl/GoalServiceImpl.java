@@ -5,10 +5,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalStatusUpdateRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalDetailsResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.Goal;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
+import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutLog;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalStatus;
 import pl.tomaszosuch.trainingplatform_backend.exception.GoalNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
@@ -56,6 +58,19 @@ public class GoalServiceImpl implements GoalService {
         return goals.stream()
                 .map(goal -> goalMapper.toResponse(goal, progress.get(goal.getId())))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GoalDetailsResponse getGoal(Long userId, Long goalId) {
+        Goal goal = findOwnedGoal(goalId, userId);
+
+        List<WorkoutLog> logs = goalProgressService.matchingLogs(goal);
+        GoalProgress progress = goalProgressService.progressOf(goal, logs);
+        return new  GoalDetailsResponse(
+                goalMapper.toResponse(goal, progress),
+                logs.stream().map(goalMapper::toLogEntry).toList()
+        );
     }
 
     @Override

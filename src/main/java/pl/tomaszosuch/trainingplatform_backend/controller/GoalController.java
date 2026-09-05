@@ -8,12 +8,12 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.GoalStatusUpdateRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalDetailsResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.GoalResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalStatus;
 import pl.tomaszosuch.trainingplatform_backend.service.GoalService;
 
-import java.nio.file.AccessDeniedException;
 import java.util.List;
 
 @RestController
@@ -31,6 +31,13 @@ public class GoalController {
         return ResponseEntity.ok(goalService.getGoals(currentUser.getId(), filter));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<GoalDetailsResponse> getById(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(goalService.getGoal(currentUser.getId(), id));
+    }
+
     @PostMapping
     public ResponseEntity<GoalResponse> create(
             @AuthenticationPrincipal User currentUser,
@@ -43,7 +50,7 @@ public class GoalController {
     public ResponseEntity<GoalResponse> update(
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long id,
-            @Valid @RequestBody GoalRequest request) throws AccessDeniedException {
+            @Valid @RequestBody GoalRequest request) {
         return ResponseEntity.ok(goalService.updateGoal(currentUser.getId(), id, request));
     }
 
@@ -58,7 +65,7 @@ public class GoalController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
             @AuthenticationPrincipal User currentUser,
-            @PathVariable Long id) throws AccessDeniedException {
+            @PathVariable Long id) {
         goalService.deleteGoal(currentUser.getId(), id);
         return ResponseEntity.noContent().build();
     }
