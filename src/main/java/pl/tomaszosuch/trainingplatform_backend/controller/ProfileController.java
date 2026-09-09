@@ -6,7 +6,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.ChangePasswordRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.DeleteAccountRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.NotificationPreferencesRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.NotificationPreferencesResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.service.ProfileService;
@@ -25,7 +27,7 @@ public class ProfileController {
     public ResponseEntity<UserResponse> getProfile(
             @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(
-            profileService.getProfile(currentUser.getId()));
+                profileService.getProfile(currentUser.getId()));
     }
 
     @PutMapping
@@ -33,7 +35,22 @@ public class ProfileController {
             @AuthenticationPrincipal User currentUser,
             @Valid @RequestBody UpdateProfileRequest request) {
         return ResponseEntity.ok(
-            profileService.updateProfile(currentUser.getId(), request));
+                profileService.updateProfile(currentUser.getId(), request));
+    }
+
+    @GetMapping("/notifications")
+    public ResponseEntity<NotificationPreferencesResponse> getNotificationPreferences(
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(
+                profileService.getNotificationPreferences(currentUser.getId()));
+    }
+
+    @PutMapping("/notifications")
+    public ResponseEntity<NotificationPreferencesResponse> updateNotificationPreferences(
+            @AuthenticationPrincipal User currentUser,
+            @Valid @RequestBody NotificationPreferencesRequest request) {
+        return ResponseEntity.ok(
+                profileService.updateNotificationPreferences(currentUser.getId(), request));
     }
 
     @PostMapping("/change-password")

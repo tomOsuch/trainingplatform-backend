@@ -31,7 +31,7 @@ import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder    
+@Builder
 @Table(name = "users")
 public class User implements UserDetails {
 
@@ -53,6 +53,12 @@ public class User implements UserDetails {
     private Role role;
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
+    @Column(name = "reminders_enabled", nullable = false)
+    @Builder.Default
+    private Boolean remindersEnabled = false;
+    @Column(name = "reminder_hours_before", nullable = false)
+    @Builder.Default
+    private Integer reminderHoursBefore = 24;
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     @Column(name = "updated_at")
@@ -61,6 +67,12 @@ public class User implements UserDetails {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        if (remindersEnabled == null) {
+            remindersEnabled = false;
+        }
+        if (reminderHoursBefore == null) {
+            reminderHoursBefore = 24;
+        }
     }
 
     @PreUpdate
@@ -79,7 +91,9 @@ public class User implements UserDetails {
     }
 
     @Override
-    public boolean isAccountNonExpired() { return true; }
+    public boolean isAccountNonExpired() {
+        return true;
+    }
 
     @Override
     public boolean isAccountNonLocked() {
@@ -87,7 +101,9 @@ public class User implements UserDetails {
     }
 
     @Override
-    public boolean isCredentialsNonExpired() { return true; }
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
 
     @Override
     public boolean isEnabled() {

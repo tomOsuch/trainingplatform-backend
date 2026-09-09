@@ -13,7 +13,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.ChangePasswordRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.DeleteAccountRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.NotificationPreferencesRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.NotificationPreferencesResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
@@ -24,6 +26,7 @@ import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.ProfileServiceImpl;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -356,5 +359,54 @@ public class ProfileServiceImplTest {
 
             verify(userRepository, never()).delete(any(User.class));
         }
+    }
+
+    @Test
+    @DisplayName("odczyt preferencji zwraca zapisane ustawienia")
+    void shouldReturnNotificationPreferences() {
+        existingUser.setRemindersEnabled(true);
+        existingUser.setReminderHoursBefore(48);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
+        when(userMapper.toNotificationPreferences(existingUser))
+                .thenReturn(new NotificationPreferencesResponse(true, 48));
+
+        NotificationPreferencesResponse response = profileService.getNotificationPreferences(1L);
+
+        assertTrue(response.remindersEnabled());
+        assertEquals(48, response.reminderHoursBefore());
+    }
+
+    @Test
+    @DisplayName("zapis preferencji ustawia oba pola")
+    void shouldUpdateNotificationPreferences() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        profileService.updateNotificationPreferences(1L, new NotificationPreferencesRequest(true, 12));
+
+        assertTrue(existingUser.getRemindersEnabled());
+        assertEquals(12, existingUser.getReminderHoursBefore());
+    }
+
+    @Test
+    @DisplayName("wyłączenie przypomnień zachowuje wybrane wyprzedzenie")
+    void shouldKeepHoursWhenDisabling() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        profileService.updateNotificationPreferences(1L, new NotificationPreferencesRequest(false, 72));
+
+        assertFalse(existingUser.getRemindersEnabled());
+        assertEquals(72, existingUser.getReminderHoursBefore());
+    }
+
+    @Test
+    @DisplayName("preferencje nieistniejącego konta zwracają 404")
+    void shouldThrowWhenUserMissingForPreferences() {
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class, () -> profileService.getNotificationPreferences(99L));
+        assertThrows(UserNotFoundException.class,
+                () -> profileService.updateNotificationPreferences(99L, new NotificationPreferencesRequest(true, 24)));
     }
 }

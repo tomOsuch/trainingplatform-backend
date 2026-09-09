@@ -332,8 +332,11 @@ Dołączona jest kolekcja **Postman** (`trainingplatform.postman_collection.json
 | `PUT` | `/profile` | Aktualizacja danych | USER |
 | `POST` | `/profile/change-password` | Zmiana hasła | USER |
 | `DELETE` | `/profile` | Usunięcie konta (`{ password }`) | USER |
+| `GET` | `/profile/notifications` | Odczyt preferencji przypomnień | USER |
+| `PUT` | `/profile/notifications` | Zapis preferencji przypomnień | USER |
 
 > `UserResponse` zawiera `birthDate` w formacie `yyyy-MM-dd`.
+> Preferencje przypomnień są **poza** `GET`/`PUT /profile` celowo: zapis profilu nie może nadpisać zgody na kontakt mailowy. Przypomnienia są **domyślnie wyłączone**, wyprzedzenie domyślnie 24 h, dozwolony zakres 1–168 h. Wyłączenie zachowuje wybrane wyprzedzenie.
 
 ### Kategorie treningów (`/workout-categories`)
 

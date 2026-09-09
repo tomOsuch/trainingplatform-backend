@@ -8,7 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.ChangePasswordRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.DeleteAccountRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.NotificationPreferencesRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.NotificationPreferencesResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
@@ -36,7 +38,7 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Override
     public UserResponse getProfile(Long id) {
-        
+
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
 
@@ -45,7 +47,7 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Override
     public UserResponse updateProfile(Long id, UpdateProfileRequest request) {
-        
+
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
 
@@ -59,7 +61,7 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Override
     public void changePassword(Long id, ChangePasswordRequest request) {
-        
+
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
 
@@ -106,6 +108,28 @@ public class ProfileServiceImpl implements ProfileService {
 
         log.warn("Usunięto konto {} (rola {}), unieważniono {} oczekujących zaproszeń",
                 user.getEmail(), user.getRole(), revoked);
+    }
+
+    @Override
+    public NotificationPreferencesResponse getNotificationPreferences(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        return userMapper.toNotificationPreferences(user);
+    }
+
+    @Override
+    public NotificationPreferencesResponse updateNotificationPreferences(Long userId, NotificationPreferencesRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        user.setRemindersEnabled(request.remindersEnabled());
+        user.setReminderHoursBefore(request.reminderHoursBefore());
+
+        log.info("Zmieniono preferencje przypomnień konta {}: włączone={}, wyprzedzenie={} h",
+                user.getEmail(), request.remindersEnabled(), request.reminderHoursBefore());
+
+        return userMapper.toNotificationPreferences(userRepository.save(user));
     }
 
 }
