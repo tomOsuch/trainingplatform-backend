@@ -1,16 +1,17 @@
 package pl.tomaszosuch.trainingplatform_backend.service;
 
+import static org.junit.Assert.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,10 +20,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
 import pl.tomaszosuch.trainingplatform_backend.repository.CategoryStatsView;
+import pl.tomaszosuch.trainingplatform_backend.repository.PlanStatusCountView;
+import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutLogRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.StatisticsServiceImpl;
 import pl.tomaszosuch.trainingplatform_backend.service.model.CategoryStatistics;
+import pl.tomaszosuch.trainingplatform_backend.service.model.PlanCompletion;
 import pl.tomaszosuch.trainingplatform_backend.service.model.WorkoutStatistics;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +39,9 @@ class StatisticsServiceImplTest {
 
     @Mock
     private WorkoutLogRepository workoutLogRepository;
+
+    @Mock
+    private TrainingPlanRepository trainingPlanRepository;
 
     @InjectMocks
     private StatisticsServiceImpl service;
@@ -60,6 +68,20 @@ class StatisticsServiceImplTest {
                 return minutes;
             }
         };
+    }
+
+    private static PlanStatusCountView statusRow(PlanStatus status, long count) {
+        return new PlanStatusCountView() {
+            public PlanStatus getStatus() { return status; }
+            public Long getCount() { return count; }
+        };
+    }
+
+    private void givenPlanCounts(Map<PlanStatus, Long> counts) {
+        when(trainingPlanRepository.countByStatus(eq(7L), eq(FROM), eq(TO), any()))
+                .thenReturn(counts.entrySet().stream()
+                        .map(e -> statusRow(e.getKey(), e.getValue()))
+                        .toList());
     }
 
     @Test
@@ -136,6 +158,87 @@ class StatisticsServiceImplTest {
         assertTrue(ex.getMessage().contains("początkowa"));
 
         verify(workoutLogRepository, never()).aggregateByCategory(anyLong(), any(), any());
+    }
+
+    @Test
+    @DisplayName("statusy trafiają do właściwych kubełków, PLANNED to nierozstrzygnięte")
+    void shouldMapStatusesToBuckets() {
+        givenPlanCounts(Map.of(
+                PlanStatus.COMPLETED, 6L,
+                PlanStatus.SKIPPED, 2L,
+                PlanStatus.CANCELLED, 3L,
+                PlanStatus.PLANNED, 4L));
+
+        PlanCompletion completion = service.planCompletion(7L, FROM, TO);
+
+        assertEquals(6, completion.completed());
+        assertEquals(2, completion.skipped());
+        assertEquals(3, completion.cancelled());
+        assertEquals(4, completion.unresolved());
+    }
+
+    @Test
+    @DisplayName("mianownik pomija anulowane, ale wlicza nierozstrzygnięte")
+    void shouldExcludeCancelledAndIncludeUnresolvedInBase() {
+        givenPlanCounts(Map.of(
+                PlanStatus.COMPLETED, 6L,
+                PlanStatus.SKIPPED, 2L,
+                PlanStatus.CANCELLED, 3L,
+                PlanStatus.PLANNED, 4L));
+
+        PlanCompletion completion = service.planCompletion(7L, FROM, TO);
+
+        assertEquals(12, completion.completionBase());   // 6 + 2 + 4, bez 3 anulowanych
+        assertEquals(50, completion.completionRate());
+    }
+
+    @Test
+    @DisplayName("brakujące statusy to zera")
+    void shouldDefaultMissingStatusesToZero() {
+        givenPlanCounts(Map.of(PlanStatus.COMPLETED, 5L));
+
+        PlanCompletion completion = service.planCompletion(7L, FROM, TO);
+
+        assertEquals(5, completion.completed());
+        assertEquals(0, completion.skipped());
+        assertEquals(0, completion.cancelled());
+        assertEquals(0, completion.unresolved());
+        assertEquals(100, completion.completionRate());
+    }
+
+    @Test
+    @DisplayName("okres bez planów: zera i procent null, nie zero procent")
+    void shouldReturnNullRateForEmptyPeriod() {
+        givenPlanCounts(Map.of());
+
+        PlanCompletion completion = service.planCompletion(7L, FROM, TO);
+
+        assertEquals(0, completion.completionBase());
+        assertNull(completion.completionRate());
+    }
+
+    @Test
+    @DisplayName("same anulowane też dają procent null — nie ma czego liczyć")
+    void shouldReturnNullRateWhenOnlyCancelled() {
+        givenPlanCounts(Map.of(PlanStatus.CANCELLED, 4L));
+
+        assertNull(service.planCompletion(7L, FROM, TO).completionRate());
+    }
+
+    @Test
+    @DisplayName("procent jest obcinany, nie zaokrąglany")
+    void shouldTruncatePercent() {
+        assertEquals(66, new PlanCompletion(2, 1, 0, 0).completionRate());    // 66,67%
+        assertEquals(99, new PlanCompletion(199, 1, 0, 0).completionRate());  // 99,5% to nie 100%
+    }
+
+    @Test
+    @DisplayName("realizacja planu też waliduje zakres dat")
+    void shouldRejectInvalidRangeForPlanCompletion() {
+        assertThrows(IllegalArgumentException.class, () -> service.planCompletion(7L, null, TO));
+        assertThrows(IllegalArgumentException.class, () -> service.planCompletion(7L, TO, FROM));
+
+        verify(trainingPlanRepository, never()).countByStatus(anyLong(), any(), any(), any());
     }
 
 }

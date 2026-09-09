@@ -3,14 +3,20 @@ package pl.tomaszosuch.trainingplatform_backend.service.impl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
+import pl.tomaszosuch.trainingplatform_backend.repository.PlanStatusCountView;
+import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutLogRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.StatisticsService;
 import pl.tomaszosuch.trainingplatform_backend.service.model.CategoryStatistics;
+import pl.tomaszosuch.trainingplatform_backend.service.model.PlanCompletion;
 import pl.tomaszosuch.trainingplatform_backend.service.model.WorkoutStatistics;
 
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +31,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                     .thenComparing(CategoryStatistics::categoryName);
 
     private final WorkoutLogRepository workoutLogRepository;
+    private final TrainingPlanRepository trainingPlanRepository;
 
     @Override
     public WorkoutStatistics workoutStatistics(Long userId, LocalDate from, LocalDate to) {
@@ -44,6 +51,19 @@ public class StatisticsServiceImpl implements StatisticsService {
         long totalMinutes = byCategory.stream().mapToLong(CategoryStatistics::minutes).sum();
 
         return new WorkoutStatistics(totalSessions, totalMinutes, byCategory);
+    }
+
+    @Override
+    public PlanCompletion planCompletion(Long userId, LocalDate from, LocalDate to) {
+        validateRange(from, to);
+        Map<PlanStatus, Long> counts = trainingPlanRepository
+                .countByStatus(userId, from, to, LocalDate.now()).stream()
+                .collect(Collectors.toMap(PlanStatusCountView::getStatus, PlanStatusCountView::getCount));
+        return new PlanCompletion(
+                counts.getOrDefault(PlanStatus.COMPLETED, 0L),
+                counts.getOrDefault(PlanStatus.SKIPPED, 0L),
+                counts.getOrDefault(PlanStatus.CANCELLED, 0L),
+                counts.getOrDefault(PlanStatus.PLANNED, 0L));
     }
 
     private static void validateRange(LocalDate from, LocalDate to) {
