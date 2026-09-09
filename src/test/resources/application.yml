@@ -42,3 +42,7 @@ app:
     password-reset-window: 60m
     invitation-per-admin: 20
     invitation-window: 60m
+  reminders:
+    enabled: false
+    cron: "0 0 * * * *"
+    default-start-time: "12:00"

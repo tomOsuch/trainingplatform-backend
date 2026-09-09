@@ -76,6 +76,10 @@ app:
     password-reset-window: ${RATE_LIMIT_RESET_WINDOW:60m}
     invitation-per-admin: ${RATE_LIMIT_INVITATION_PER_ADMIN:20}
     invitation-window: ${RATE_LIMIT_INVITATION_WINDOW:60m}
+  reminders:
+    enabled: ${REMINDERS_ENABLED:true}
+    cron: ${REMINDERS_CRON:0 0 * * * *}
+    default-start-time: ${REMINDERS_DEFAULT_START_TIME:12:00}
 
 springdoc:
   api-docs:

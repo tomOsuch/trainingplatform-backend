@@ -65,6 +65,9 @@ public class TrainingPlan {
     @Builder.Default
     private PlanStatus status = PlanStatus.PLANNED;
 
+    @Column(name = "reminder_sent_at")
+    private LocalDateTime reminderSentAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
