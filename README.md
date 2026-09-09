@@ -370,6 +370,29 @@ Dołączona jest kolekcja **Postman** (`trainingplatform.postman_collection.json
 
 > Wpis zawiera opcjonalny `title` oraz `performedTime` — godzinę rozpoczęcia w formacie `HH:mm`.
 
+### Cele treningowe (`/goals`)
+
+| Metoda | Endpoint | Opis | Dostęp |
+|--------|----------|------|--------|
+| `GET` | `/goals?status=active\|achieved` | Lista celów z policzonym postępem | USER |
+| `GET` | `/goals/{id}` | Szczegóły celu z listą wliczonych treningów | USER |
+| `POST` | `/goals` | Utworzenie celu | USER |
+| `PUT` | `/goals/{id}` | Edycja celu | USER |
+| `PATCH` | `/goals/{id}/status` | Oznaczenie jako osiągnięty (`ACHIEVED`) lub cofnięcie (`ACTIVE`) | USER |
+| `DELETE` | `/goals/{id}` | Usunięcie celu | USER |
+
+> Cel ma **jedną miarę** — `SESSIONS` albo `MINUTES` — i jawne okno `startDate`/`endDate` (puste `endDate` = cel otwarty). Postęp nie jest przechowywany: liczy się z dziennika przy każdym odczycie. Oznaczenie celu jako osiągniętego zamraża postęp migawką `achievedValue`; osiągnięty cel nie podlega edycji przez `PUT`. Pole `targetReached` sygnalizuje przekroczenie progu — zamknięcie celu pozostaje decyzją użytkownika. `POST` zwraca `201 Created`, `DELETE` — `204 No Content`; usunięcie celu nie rusza wpisów w dzienniku.
+
+### Statystyki (`/statistics`)
+
+| Metoda | Endpoint | Opis | Dostęp |
+|--------|----------|------|--------|
+| `GET` | `/statistics?from=&to=` | Agregaty dziennika i realizacja planu za okres | USER |
+
+> Obie granice zakresu są **domknięte**. Bez parametrów odpowiedź obejmuje bieżący miesiąc, a jego granice wracają w polach `from` i `to`; podanie tylko jednej granicy to `400`.
+>
+> `planCompletion.completionBase` to mianownik wskaźnika: ukończone + pominięte + **nierozstrzygnięte** (plany `PLANNED` z minioną datą), **bez anulowanych**. Plany `PLANNED` z datą dzisiejszą lub przyszłą nie są liczone w ogóle. `completionRate` jest `null`, gdy w okresie nie było czego liczyć.
+
 ---
 
 ## ⚠️ Obsługa błędów
