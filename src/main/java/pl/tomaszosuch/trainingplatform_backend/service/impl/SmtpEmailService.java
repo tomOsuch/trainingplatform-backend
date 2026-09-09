@@ -1,7 +1,9 @@
 package pl.tomaszosuch.trainingplatform_backend.service.impl;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
@@ -33,6 +35,11 @@ public class SmtpEmailService implements EmailService {
     private static final DateTimeFormatter EXPIRY_FORMAT =
             DateTimeFormatter.ofPattern("d MMMM yyyy, HH:mm", PL);
 
+    private static final DateTimeFormatter DATE_FORMAT =
+            DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", PL);
+
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+
     private final JavaMailSender mailSender;
     private final MailProperties properties;
     private final SpringTemplateEngine templateEngine;
@@ -47,20 +54,20 @@ public class SmtpEmailService implements EmailService {
                 "mail/invitation",
                 Map.of("url", invitationUrl, "expiry", expiry),
                 """
-                Cześć,
-   
-                zapraszamy Cię do Platformy Treningowej — aplikacji do planowania
-                i rejestrowania treningów.
-   
-                Aby założyć konto, otwórz poniższy link:
-   
-                %s
-   
-                Link jest ważny do %s. Po tym terminie poproś o nowe zaproszenie.
-   
-                Jeśli nie spodziewasz się tej wiadomości, zignoruj ją — bez kliknięcia
-                w link nic się nie stanie.
-                """.formatted(invitationUrl, expiry));
+                        Cześć,
+                        
+                        zapraszamy Cię do Platformy Treningowej — aplikacji do planowania
+                        i rejestrowania treningów.
+                        
+                        Aby założyć konto, otwórz poniższy link:
+                        
+                        %s
+                        
+                        Link jest ważny do %s. Po tym terminie poproś o nowe zaproszenie.
+                        
+                        Jeśli nie spodziewasz się tej wiadomości, zignoruj ją — bez kliknięcia
+                        w link nic się nie stanie.
+                        """.formatted(invitationUrl, expiry));
     }
 
     @Override
@@ -73,19 +80,45 @@ public class SmtpEmailService implements EmailService {
                 "mail/password-reset",
                 Map.of("url", resetUrl, "expiry", expiry),
                 """
+                        Cześć,
+                        
+                        ktoś poprosił o zresetowanie hasła do Twojego konta w Platformie Treningowej.
+                        
+                        Aby ustawić nowe hasło, otwórz poniższy link:
+                        
+                        %s
+                        
+                        Link jest ważny do %s i zadziała tylko raz.
+                        
+                        Jeśli to nie Ty prosiłeś o reset, zignoruj tę wiadomość. Twoje hasło
+                        pozostanie bez zmian.
+                        """.formatted(resetUrl, expiry));
+    }
+
+    @Override
+    public void sendTrainingReminder(String recipientEmail, String planTitle, String categoryName,
+                                     LocalDate plannedDate, LocalTime plannedTime) {
+
+        String when = plannedTime != null
+                ? DATE_FORMAT.format(plannedDate) + ", godz. " + TIME_FORMAT.format(plannedTime)
+                : DATE_FORMAT.format(plannedDate);
+
+        send(recipientEmail,
+                "Przypomnienie o treningu — Platforma Treningowa",
+                "mail/training-reminder",
+                Map.of("title", planTitle, "categoryName", categoryName, "when", when),
+                """
                 Cześć,
-   
-                ktoś poprosił o zresetowanie hasła do Twojego konta w Platformie Treningowej.
-   
-                Aby ustawić nowe hasło, otwórz poniższy link:
-   
-                %s
-   
-                Link jest ważny do %s i zadziała tylko raz.
-   
-                Jeśli to nie Ty prosiłeś o reset, zignoruj tę wiadomość. Twoje hasło
-                pozostanie bez zmian.
-                """.formatted(resetUrl, expiry));
+
+                masz zaplanowany trening — %s.
+
+                %s (%s)
+
+                Po treningu dodaj wpis w dzienniku — dzięki temu zaliczy się do Twoich
+                celów i statystyk.
+
+                Nie chcesz takich wiadomości? Wyłącz przypomnienia w ustawieniach profilu.
+                """.formatted(when, planTitle, categoryName));
     }
 
     private void send(String recipient, String subject, String template,

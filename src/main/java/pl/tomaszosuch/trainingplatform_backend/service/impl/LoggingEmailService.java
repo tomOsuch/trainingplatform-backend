@@ -5,7 +5,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import pl.tomaszosuch.trainingplatform_backend.service.EmailService;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
@@ -33,6 +35,21 @@ public class LoggingEmailService implements EmailService {
     @Override
     public void sendPasswordReset(String recipientEmail, String resetUrl, LocalDateTime expiresAt) {
         logMail("RESET HASŁA", recipientEmail, resetUrl, expiresAt);
+    }
+
+    @Override
+    public void sendTrainingReminder(String recipientEmail, String planTitle, String categoryName,
+                                     LocalDate plannedDate, LocalTime plannedTime) {
+        log.info("""
+
+                ─────────── PRZYPOMNIENIE O TRENINGU — tryb lokalny, mail NIE został wysłany ───────────
+                  Do:        {}
+                  Trening:   {} ({})
+                  Termin:    {} {}
+                ────────────────────────────────────────────────────────────────────────────────────────
+                """,
+                recipientEmail, planTitle, categoryName, plannedDate,
+                plannedTime != null ? plannedTime : "(bez godziny)");
     }
 
     private void logMail(String kind, String recipient, String url, LocalDateTime expiresAt) {
