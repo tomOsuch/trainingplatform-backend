@@ -9,6 +9,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import pl.tomaszosuch.trainingplatform_backend.dto.response.CategoryStatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.StatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.service.model.CategoryStatistics;
 import pl.tomaszosuch.trainingplatform_backend.service.model.PlanCompletion;
@@ -45,6 +46,25 @@ class StatisticsMapperTest {
                 new WorkoutStatistics(0, 0, List.of()), new PlanCompletion(0, 0, 0, 0));
 
         assertNull(response.planCompletion().completionRate());
+    }
+
+    @Test
+    @DisplayName("suma minut i treningów z rozbicia równa się wartościom z poziomu głównego")
+    void shouldKeepPartsSummingToWholeInResponse() {
+        WorkoutStatistics stats = new WorkoutStatistics(9, 885, List.of(
+                new CategoryStatistics(1L, "Taniec", "#9B59B6", 7L, 705L),
+                new CategoryStatistics(2L, "Gimnastyka", "#E74C3C", 2L, 180L)));
+
+        StatisticsResponse response = mapper.toResponse(
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), stats, new PlanCompletion(4, 1, 0, 0));
+
+        long minutesFromParts = response.byCategory().stream()
+                .mapToLong(CategoryStatisticsResponse::totalMinutes).sum();
+        long countFromParts = response.byCategory().stream()
+                .mapToLong(CategoryStatisticsResponse::workoutCount).sum();
+
+        assertEquals(response.totalMinutes(), minutesFromParts);
+        assertEquals(response.workoutCount(), countFromParts);
     }
 
 }
