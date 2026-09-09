@@ -3,7 +3,9 @@ package pl.tomaszosuch.trainingplatform_backend.service.impl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.StatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
+import pl.tomaszosuch.trainingplatform_backend.mapper.StatisticsMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.PlanStatusCountView;
 import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutLogRepository;
@@ -32,6 +34,7 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     private final WorkoutLogRepository workoutLogRepository;
     private final TrainingPlanRepository trainingPlanRepository;
+    private final StatisticsMapper statisticsMapper;
 
     @Override
     public WorkoutStatistics workoutStatistics(Long userId, LocalDate from, LocalDate to) {
@@ -64,6 +67,12 @@ public class StatisticsServiceImpl implements StatisticsService {
                 counts.getOrDefault(PlanStatus.SKIPPED, 0L),
                 counts.getOrDefault(PlanStatus.CANCELLED, 0L),
                 counts.getOrDefault(PlanStatus.PLANNED, 0L));
+    }
+
+    @Override
+    public StatisticsResponse statistics(Long userId, LocalDate from, LocalDate to) {
+        validateRange(from, to);
+        return statisticsMapper.toResponse(from, to, workoutStatistics(userId, from, to), planCompletion(userId, from, to));
     }
 
     private static void validateRange(LocalDate from, LocalDate to) {

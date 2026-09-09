@@ -5,9 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -21,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
+import pl.tomaszosuch.trainingplatform_backend.mapper.StatisticsMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.CategoryStatsView;
 import pl.tomaszosuch.trainingplatform_backend.repository.PlanStatusCountView;
 import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
@@ -42,6 +41,9 @@ class StatisticsServiceImplTest {
 
     @Mock
     private TrainingPlanRepository trainingPlanRepository;
+
+    @Mock
+    private StatisticsMapper statisticsMapper;
 
     @InjectMocks
     private StatisticsServiceImpl service;
@@ -72,8 +74,13 @@ class StatisticsServiceImplTest {
 
     private static PlanStatusCountView statusRow(PlanStatus status, long count) {
         return new PlanStatusCountView() {
-            public PlanStatus getStatus() { return status; }
-            public Long getCount() { return count; }
+            public PlanStatus getStatus() {
+                return status;
+            }
+
+            public Long getCount() {
+                return count;
+            }
         };
     }
 
@@ -239,6 +246,29 @@ class StatisticsServiceImplTest {
         assertThrows(IllegalArgumentException.class, () -> service.planCompletion(7L, TO, FROM));
 
         verify(trainingPlanRepository, never()).countByStatus(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("statistics składa agregaty dziennika i realizację planu w jedną odpowiedź")
+    void shouldComposeBothParts() {
+        when(workoutLogRepository.aggregateByCategory(7L, FROM, TO))
+                .thenReturn(List.of(row(5L, "Taniec", "#9B59B6", 4, 240)));
+        givenPlanCounts(Map.of(PlanStatus.COMPLETED, 6L, PlanStatus.PLANNED, 2L));
+
+        service.statistics(7L, FROM, TO);
+
+        verify(statisticsMapper).toResponse(eq(FROM), eq(TO),
+                any(WorkoutStatistics.class), any(PlanCompletion.class));
+    }
+
+    @Test
+    @DisplayName("odwrócony zakres nie sięga do bazy ani do mappera")
+    void shouldValidateRangeBeforeQuerying() {
+        assertThrows(IllegalArgumentException.class, () -> service.statistics(7L, TO, FROM));
+
+        verify(workoutLogRepository, never()).aggregateByCategory(anyLong(), any(), any());
+        verify(trainingPlanRepository, never()).countByStatus(anyLong(), any(), any(), any());
+        verifyNoInteractions(statisticsMapper);
     }
 
 }
