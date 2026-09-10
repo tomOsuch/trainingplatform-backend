@@ -67,10 +67,8 @@ public class GoalServiceImpl implements GoalService {
 
         List<WorkoutLog> logs = goalProgressService.matchingLogs(goal);
         GoalProgress progress = goalProgressService.progressOf(goal, logs);
-        return new  GoalDetailsResponse(
-                goalMapper.toResponse(goal, progress),
-                logs.stream().map(goalMapper::toLogEntry).toList()
-        );
+
+        return goalMapper.toDetailsResponse(goal, progress, logs);
     }
 
     @Override
