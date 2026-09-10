@@ -1,5 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -14,8 +15,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -76,6 +80,7 @@ class GoalControllerTest {
     private User currentUser;
     private GoalResponse goalResponse;
     private GoalRequest validRequest;
+    private GoalDetailsResponse detailsResponse;
 
     @BeforeEach
     void setUp() {
@@ -88,6 +93,16 @@ class GoalControllerTest {
                 10L, "100 godzin tańca", null, 5L, "Taniec", "#9B59B6",
                 GoalMetric.MINUTES, 6000, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
                 1500L, 25, false, false, null);
+
+        detailsResponse = new GoalDetailsResponse(
+                goalResponse.id(), goalResponse.title(), goalResponse.description(),
+                goalResponse.categoryId(), goalResponse.categoryName(), goalResponse.categoryColor(),
+                goalResponse.metric(), goalResponse.targetValue(), goalResponse.startDate(),
+                goalResponse.endDate(), goalResponse.currentValue(), goalResponse.percent(),
+                goalResponse.targetReached(), goalResponse.achieved(), goalResponse.achievedAt(),
+                List.of(
+                        new GoalLogEntryResponse(31L, "Salsa", LocalDate.of(2026, 3, 10), 60, 5L, "Taniec", "#9B59B6"),
+                        new GoalLogEntryResponse(30L, null, LocalDate.of(2026, 3, 1), 45, 5L, "Taniec", "#9B59B6")));
 
         validRequest = new GoalRequest(
                 "100 godzin tańca", null, 5L, GoalMetric.MINUTES, 6000,
@@ -286,15 +301,15 @@ class GoalControllerTest {
     @Test
     @DisplayName("GET /goals/{id} zwraca 200 z celem i wliczonymi wpisami")
     void shouldReturn200WithGoalDetails() throws Exception {
-        GoalDetailsResponse details = new GoalDetailsResponse(goalResponse, List.of(
-                new GoalLogEntryResponse(31L, "Salsa", LocalDate.of(2026, 3, 10), 60, 5L, "Taniec", "#9B59B6"),
-                new GoalLogEntryResponse(30L, null, LocalDate.of(2026, 3, 1), 45, 5L, "Taniec", "#9B59B6")));
-        when(goalService.getGoal(1L, 10L)).thenReturn(details);
+        when(goalService.getGoal(1L, 10L)).thenReturn(detailsResponse);
 
         mockMvc.perform(get("/goals/10").with(user(currentUser)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.goal.id").value(10))
-                .andExpect(jsonPath("$.goal.currentValue").value(1500))
+                .andExpect(jsonPath("$.id").value(10))
+                .andExpect(jsonPath("$.title").value("100 godzin tańca"))
+                .andExpect(jsonPath("$.metric").value("MINUTES"))
+                .andExpect(jsonPath("$.targetValue").value(6000))
+                .andExpect(jsonPath("$.currentValue").value(1500))
                 .andExpect(jsonPath("$.entries.length()").value(2))
                 .andExpect(jsonPath("$.entries[0].id").value(31))
                 .andExpect(jsonPath("$.entries[0].categoryName").value("Taniec"));
@@ -316,6 +331,38 @@ class GoalControllerTest {
 
         mockMvc.perform(get("/goals/99").with(user(currentUser)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("GET /goals/{id} zwraca cel w tym samym kształcie co lista, plus entries")
+    void shouldKeepSameGoalShapeInListAndDetails() throws Exception {
+        when(goalService.getGoals(eq(1L), isNull())).thenReturn(List.of(goalResponse));
+        when(goalService.getGoal(1L, 10L)).thenReturn(detailsResponse);
+
+        JsonNode listItem = objectMapper.readTree(
+                mockMvc.perform(get("/goals").with(user(currentUser)))
+                        .andReturn().getResponse().getContentAsString()).get(0);
+        JsonNode details = objectMapper.readTree(
+                mockMvc.perform(get("/goals/10").with(user(currentUser)))
+                        .andReturn().getResponse().getContentAsString());
+
+        Set<String> listFields = fieldNames(listItem);
+
+        // Każde pole celu z listy musi być w szczegółach, pod tą samą nazwą i z tą samą wartością.
+        for (String field : listFields) {
+            assertEquals(listItem.get(field), details.get(field), "pole " + field);
+        }
+
+        // ...i nic ponad entries. Pole dodane tylko do jednej odpowiedzi wywali ten test.
+        Set<String> extra = fieldNames(details);
+        extra.removeAll(listFields);
+        assertEquals(Set.of("entries"), extra);
+    }
+
+    private static Set<String> fieldNames(JsonNode node) {
+        Set<String> names = new LinkedHashSet<>();
+        node.fieldNames().forEachRemaining(names::add);
+        return names;
     }
 
 }

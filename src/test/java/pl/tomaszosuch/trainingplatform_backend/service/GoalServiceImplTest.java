@@ -291,9 +291,7 @@ class GoalServiceImplTest {
 
         service.getGoal(1L, 10L);
 
-        verify(goalMapper).toResponse(goal, progress);
-        verify(goalMapper).toLogEntry(logs.get(0));
-        verify(goalMapper).toLogEntry(logs.get(1));
+        verify(goalMapper).toDetailsResponse(goal, progress, logs);
         verify(goalProgressService, never()).progressOf(goal);
     }
 
