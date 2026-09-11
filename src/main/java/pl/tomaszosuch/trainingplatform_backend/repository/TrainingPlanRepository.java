@@ -44,6 +44,7 @@ public interface TrainingPlanRepository extends JpaRepository<TrainingPlan, Long
             WHERE p.status = pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus.PLANNED
               AND p.reminderSentAt IS NULL
               AND u.remindersEnabled = true
+              AND u.isActive = true
               AND p.plannedDate >= :fromDate
             ORDER BY p.plannedDate ASC
             """)
