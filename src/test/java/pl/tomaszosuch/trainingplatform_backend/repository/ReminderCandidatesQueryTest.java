@@ -49,15 +49,15 @@ class ReminderCandidatesQueryTest {
 
     @BeforeEach
     void setUp() {
-        enabled = em.persist(user("chce@example.com", true));
-        disabled = em.persist(user("niechce@example.com", false));
+        enabled = em.persist(user("chce@example.com", true, true));
+        disabled = em.persist(user("niechce@example.com", false, true));
         category = em.persist(WorkoutCategory.builder().name("Taniec").build());
     }
 
-    private static User user(String email, boolean remindersEnabled) {
+    private static User user(String email, boolean remindersEnabled, boolean active)  {
         return User.builder()
                 .email(email).password("hash").firstName("Jan").lastName("Testowy")
-                .role(Role.USER).isActive(true)
+                .role(Role.USER).isActive(active)
                 .remindersEnabled(remindersEnabled).reminderHoursBefore(24)
                 .build();
     }
@@ -110,6 +110,19 @@ class ReminderCandidatesQueryTest {
         assertEquals(0, trainingPlanRepository.markReminderSent(plan.getId(), now.plusHours(1)));
 
         assertTrue(candidates().isEmpty());
+    }
+
+    @Test
+    @DisplayName("konto nieaktywne nie dostaje przypomnienia mimo włączonej preferencji")
+    void shouldSkipInactiveAccounts() {
+        User inactive = em.persist(user("nieaktywny@example.com", true, false));
+        plan(inactive, TOMORROW, PlanStatus.PLANNED, null);
+        TrainingPlan expected = plan(enabled, TOMORROW, PlanStatus.PLANNED, null);
+
+        List<TrainingPlan> result = candidates();
+
+        assertEquals(1, result.size());
+        assertEquals(expected.getId(), result.get(0).getId());
     }
 
 }
