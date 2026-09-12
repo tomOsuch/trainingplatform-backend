@@ -20,9 +20,12 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 
 import pl.tomaszosuch.trainingplatform_backend.dto.request.WorkoutCategoryRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.WorkoutCategoryResponse;
+import pl.tomaszosuch.trainingplatform_backend.enums.CategoryIcon;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
 import pl.tomaszosuch.trainingplatform_backend.service.WorkoutCategoryService;
 
+import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -262,5 +265,29 @@ public class WorkoutCategoryControllerTest {
                 .andExpect(status().isForbidden());
 
         verify(workoutCategoryService, never()).deleteCategory(any());
+    }
+
+
+    @Test
+    @WithMockUser
+    @DisplayName("powinien zwrócić pełny zestaw ikon dla zalogowanego użytkownika")
+    void shouldReturnAllowedIcons() throws Exception {
+        mockMvc.perform(get("/workout-categories/icons"))
+                .andExpect(status().isOk())
+                // Rozmiar z enuma, nie liczba wpisana w teście: rozszerzenie zestawu
+                // nie powinno wymagać poprawiania tego testu.
+                .andExpect(jsonPath("$", hasSize(CategoryIcon.values().length)))
+                .andExpect(jsonPath("$", hasItems("dumbbell", "person-standing")))
+                .andExpect(jsonPath("$[0]").value(CategoryIcon.DEFAULT.value()));
+
+        // Ścieżka dosłowna wygrywa z /{id} — inaczej "icons" poszłoby do konwersji na Long.
+        verify(workoutCategoryService, never()).getCategoryById(any());
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 401 dla żądania bez uwierzytelnienia")
+    void shouldReturn401ForAnonymousIconsRequest() throws Exception {
+        mockMvc.perform(get("/workout-categories/icons"))
+                .andExpect(status().isUnauthorized());
     }
 }

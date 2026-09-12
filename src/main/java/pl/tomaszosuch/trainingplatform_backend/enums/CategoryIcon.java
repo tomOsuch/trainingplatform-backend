@@ -1,6 +1,7 @@
 package pl.tomaszosuch.trainingplatform_backend.enums;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -42,7 +43,11 @@ public enum CategoryIcon {
         return value != null && BY_VALUE.containsKey(value);
     }
 
+    public static List<String> allowedNames() {
+        return Arrays.stream(values()).map(CategoryIcon::value).toList();
+    }
+
     public static String allowedAsText() {
-        return Arrays.stream(values()).map(CategoryIcon::value).collect(Collectors.joining(", "));
+        return String.join(", ", allowedNames());
     }
 }

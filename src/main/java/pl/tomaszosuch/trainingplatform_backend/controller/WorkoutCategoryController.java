@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.WorkoutCategoryRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.WorkoutCategoryResponse;
+import pl.tomaszosuch.trainingplatform_backend.enums.CategoryIcon;
 import pl.tomaszosuch.trainingplatform_backend.service.WorkoutCategoryService;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -32,6 +33,11 @@ public class WorkoutCategoryController {
     @GetMapping
     public ResponseEntity<List<WorkoutCategoryResponse>> getAllCategories() {
         return ResponseEntity.ok(workoutCategoryService.getAllCategories());
+    }
+
+    @GetMapping("/icons")
+    public ResponseEntity<List<String>> getAvailableIcons() {
+        return ResponseEntity.ok(CategoryIcon.allowedNames());
     }
 
     @GetMapping("/{id}")
