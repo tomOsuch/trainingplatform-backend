@@ -2,6 +2,7 @@ package pl.tomaszosuch.trainingplatform_backend.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -11,7 +12,9 @@ import pl.tomaszosuch.trainingplatform_backend.config.RefreshTokenProperties;
 import pl.tomaszosuch.trainingplatform_backend.entity.RefreshToken;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
+import pl.tomaszosuch.trainingplatform_backend.exception.InvalidRefreshTokenException;
 import pl.tomaszosuch.trainingplatform_backend.repository.RefreshTokenRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.ClientInfo;
 import pl.tomaszosuch.trainingplatform_backend.security.SecureTokenGenerator;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.RefreshTokenRevoker;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.RefreshTokenServiceImpl;
@@ -19,8 +22,10 @@ import pl.tomaszosuch.trainingplatform_backend.service.impl.RefreshTokenServiceI
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("RefreshTokenServiceImplTest")
@@ -95,6 +100,19 @@ public class RefreshTokenServiceImplTest {
         when(tokenGenerator.hash(NOWY_TOKEN)).thenReturn(NOWY_HASH);
         when(refreshTokenRepository.save(any(RefreshToken.class)))
                 .thenAnswer(wywolanie -> wywolanie.getArgument(0));
+    }
+
+    @Test
+    @DisplayName("nie odnawia sesji konta wyłączonego przez administratora")
+    void shouldRejectRotationForInactiveAccount() {
+        user.setIsActive(false);
+        stubOdnalezienieStarego(aktywnyToken());
+
+        InvalidRefreshTokenException ex = assertThrows(InvalidRefreshTokenException.class,
+                () -> refreshTokenService.rotate(STARY_TOKEN, new ClientInfo("127.0.0.1", "JUnit")));
+
+        assertEquals("Konto jest nieaktywne", ex.getMessage());
+        verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
     }
 
 

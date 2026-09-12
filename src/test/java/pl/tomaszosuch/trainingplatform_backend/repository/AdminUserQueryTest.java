@@ -13,6 +13,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -25,6 +26,7 @@ import pl.tomaszosuch.trainingplatform_backend.enums.AdminUserSort;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapperImpl;
 import pl.tomaszosuch.trainingplatform_backend.service.AdminUserService;
+import pl.tomaszosuch.trainingplatform_backend.service.RefreshTokenService;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AdminUserServiceImpl;
 
 @Testcontainers
@@ -43,6 +45,12 @@ class AdminUserQueryTest {
 
     @Autowired
     private AdminUserService adminUserService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @MockitoBean
+    private RefreshTokenService refreshTokenService;
 
     @BeforeEach
     void setUp() {
@@ -114,5 +122,21 @@ class AdminUserQueryTest {
         assertEquals(1, page.page());
         assertEquals(4, page.totalElements());
         assertEquals(2, page.totalPages());
+    }
+
+
+    @Test
+    @DisplayName("licznik administratorów pomija konta wyłączone")
+    void shouldCountOnlyActiveAdmins() {
+        User active = user("Adam", "Aktywny", "admin1@example.com", true);
+        active.setRole(Role.ADMIN);
+        User inactive = user("Olga", "Wyłączona", "admin2@example.com", false);
+        inactive.setRole(Role.ADMIN);
+        em.persist(active);
+        em.persist(inactive);
+        em.flush();
+
+        assertEquals(1, userRepository.countActiveByRole(Role.ADMIN));
+        assertEquals(2, userRepository.countByRole(Role.ADMIN));
     }
 }

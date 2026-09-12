@@ -9,4 +9,6 @@ public interface AdminUserService {
 
     PageResponse<AdminUserResponse> findUsers(String search, AccountStatus status,
                                               AdminUserSort sort, int page, int size);
+
+    AdminUserResponse changeStatus(Long adminId, Long userId, AccountStatus status);
 }
