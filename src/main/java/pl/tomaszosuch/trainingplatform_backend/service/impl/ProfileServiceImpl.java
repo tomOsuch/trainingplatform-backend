@@ -98,7 +98,7 @@ public class ProfileServiceImpl implements ProfileService {
             throw new IllegalArgumentException("Nieprawidłowe hasło");
         }
 
-        if (user.getRole() == Role.ADMIN && userRepository.countByRole(Role.ADMIN) <= 1) {
+        if (user.getRole() == Role.ADMIN && userRepository.countActiveByRole(Role.ADMIN) <= 1) {
             throw new LastAdminException();
         }
 
