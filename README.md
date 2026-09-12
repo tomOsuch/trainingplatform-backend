@@ -171,6 +171,15 @@ Dostępne po starcie:
 | `INVITATION_ACCEPT_BASE_URL` | Adres strony rejestracji frontendu — dokleja się `?token=…` |
 | `PASSWORD_RESET_EXPIRATION_MINUTES` | Ważność linku resetu (domyślnie 60 minut) |
 | `PASSWORD_RESET_BASE_URL` | Adres strony resetu hasła |
+| `REFRESH_TOKEN_EXPIRATION_DAYS` | Ważność tokenu odświeżającego (domyślnie 14 dni) |
+| `REFRESH_TOKEN_COOKIE_NAME` / `_PATH` / `_SECURE` / `_SAME_SITE` | Ciasteczko httpOnly z tokenem odświeżającym (domyślnie `refreshToken`, `/api/auth`, `false`, `Lax`) |
+| `RATE_LIMIT_ENABLED` | Limit tempa logowań, resetów i zaproszeń (domyślnie `true`) |
+| `RATE_LIMIT_LOGIN_PER_IP` / `_PER_ACCOUNT` / `_WINDOW` | Próby logowania: 20 na IP, 8 na konto, okno `15m` |
+| `RATE_LIMIT_RESET_PER_EMAIL` / `_PER_IP` / `_WINDOW` | Żądania resetu: 3 na adres, 10 na IP, okno `60m` |
+| `RATE_LIMIT_INVITATION_PER_ADMIN` / `_WINDOW` | Zaproszenia: 20 na administratora, okno `60m` |
+| `REMINDERS_ENABLED` | Harmonogram przypomnień o zaplanowanych treningach (domyślnie `true`) |
+| `REMINDERS_CRON` | Wyrażenie cron harmonogramu (domyślnie `0 0 * * * *`, co godzinę) |
+| `REMINDERS_DEFAULT_START_TIME` | Godzina przyjmowana dla planu bez godziny (domyślnie `12:00`) |
 | `SPRING_PROFILES_ACTIVE` | `dev` (logi DEBUG, Swagger) albo `prod` (logi WARN, Swagger wyłączony) |
 
 ```bash
@@ -178,6 +187,8 @@ openssl rand -base64 64 | tr -d '\n'
 ```
 
 Podmiana klucza JWT unieważnia wszystkie wydane tokeny — użytkownicy muszą zalogować się ponownie.
+
+`REFRESH_TOKEN_COOKIE_SECURE` musi być `true` na produkcji — przy `false` ciasteczko z tokenem odświeżającym pójdzie także po HTTP. Domyślne `false` istnieje wyłącznie dla środowiska lokalnego bez certyfikatu (do ustawienia przy B3).
 
 **Klasy `*Properties` są walidowane** (`@Validated`): brak `INVITATION_ACCEPT_BASE_URL` albo `expirationMinutes = 0` zatrzyma start aplikacji z komunikatem wskazującym właściwość. Głośna awaria przy starcie jest zawsze lepsza od cichej awarii w działaniu.
 
@@ -268,7 +279,12 @@ src/main/resources/db/migration/
 ├── V2__composite_indexes_and_birth_date_type.sql  # indeksy złożone + birth_date → DATE
 ├── V3__invitations.sql                            # tabela invitation
 ├── V4__password_reset_tokens.sql                  # tabela password_reset_token
-└── V5__account_deletion_cascades.sql              # ON DELETE CASCADE / SET NULL
+├── V5__account_deletion_cascades.sql              # ON DELETE CASCADE / SET NULL
+├── V6__refresh_tokens.sql                         # tabela refresh_token (rotacja, user_agent)
+├── V7__goals.sql                                  # tabela goal
+├── V8__notification_preferences.sql               # preferencje przypomnień w users
+├── V9__training_plan_reminders.sql                # reminder_sent_at + indeks częściowy
+└── V10__workout_category_icon.sql                 # icon_name: NOT NULL, DEFAULT, CHECK z zamkniętą listą
 ```
 
 ### Jak dodać nową migrację
@@ -349,6 +365,8 @@ Dołączona jest kolekcja **Postman** (`trainingplatform.postman_collection.json
 | `DELETE` | `/workout-categories/{id}` | Usunięcie kategorii | ADMIN |
 
 > `POST /workout-categories` zwraca `201 Created`. Endpoint jest dostępny wyłącznie dla roli ADMIN; kategorie startowe zakłada `DataInitializer` przy pierwszym uruchomieniu.
+>
+> `iconName` jest **wymagane** i musi należeć do zamkniętego zestawu nazw ikon `lucide-react`: `dumbbell`, `footprints`, `volleyball`, `trophy`, `bike`, `waves`, `heart-pulse`, `activity`, `flame`, `mountain`, `music`, `target`, `timer`, `medal`, `zap`, `person-standing`. Zestaw żyje w enumie `CategoryIcon` i jest pilnowany dwukrotnie: walidacją żądania (`400` z listą dozwolonych nazw) oraz ograniczeniem `CHECK` w bazie. Nazwa spoza listy nie wejdzie żadną drogą, bo literówka dawałaby pustą dziurę w kalendarzu bez żadnego błędu.
 
 ### Plany treningowe (`/training-plans`)
 
@@ -396,6 +414,19 @@ Dołączona jest kolekcja **Postman** (`trainingplatform.postman_collection.json
 >
 > `planCompletion.completionBase` to mianownik wskaźnika: ukończone + pominięte + **nierozstrzygnięte** (plany `PLANNED` z minioną datą), **bez anulowanych**. Plany `PLANNED` z datą dzisiejszą lub przyszłą nie są liczone w ogóle. `completionRate` jest `null`, gdy w okresie nie było czego liczyć.
 
+### Panel administratora (`/admin`)
+
+| Metoda | Endpoint | Opis | Dostęp |
+|--------|----------|------|--------|
+| `GET` | `/admin/users?search=&status=&sort=&page=&size=` | Lista kont ze stronicowaniem | ADMIN |
+| `PATCH` | `/admin/users/{id}/status` | Wyłączenie lub przywrócenie konta (`{ status }`) | ADMIN |
+
+> Administrator widzi **wyłącznie dane konta**: imię, nazwisko, adres, rolę, stan i datę rejestracji. Endpoint nie wykonuje żadnego zapytania do dziennika, planów ani celów (BR-05).
+>
+> `search` przeszukuje nazwisko i adres bez względu na wielkość liter; `_` i `%` są traktowane jako znaki, nie wzorce. `status` to `ACTIVE` albo `INACTIVE`, brak parametru oznacza wszystkie stany. `sort` to `LAST_NAME` (domyślnie, rosnąco) albo `NEWEST` (data rejestracji malejąco) — enum nazywa porządek, więc kierunek nie jest osobnym parametrem. `size` ma górną granicę 100. Odpowiedź ma własny kształt `{ content, page, size, totalElements, totalPages }`, niezależny od wewnętrznej reprezentacji Spring Data.
+>
+> `PATCH /{id}/status` przyjmuje `{"status":"INACTIVE"}` albo `{"status":"ACTIVE"}` i zwraca konto w **tym samym kształcie co pozycja listy**. Wyłączenie unieważnia wszystkie tokeny odświeżające użytkownika, więc przywrócenie konta oddaje dostęp, ale nie wskrzesza sesji sprzed wyłączenia. Dane użytkownika pozostają nietknięte, przypomnienia przestają wychodzić. Dwie blokady: własne konto i ostatni **aktywny** administrator.
+
 ---
 
 ## ⚠️ Obsługa błędów
@@ -412,9 +443,9 @@ Wszystkie błędy w jednolitym formacie JSON:
 
 | Kod | Kiedy występuje | Przykład |
 |-----|-----------------|----------|
-| `400` | Błąd walidacji, niepoprawne dane, nieważny token zaproszenia lub resetu, błędne hasło przy usuwaniu konta | brak tokenu, link wygasły lub wykorzystany |
-| `401` | Brak/nieważny token JWT albo błędne dane logowania | żądanie bez nagłówka `Authorization` |
-| `403` | Brak uprawnień do zasobu; próba usunięcia ostatniego administratora | USER na endpoincie ADMIN |
+| `400` | Błąd walidacji, niepoprawne dane, nieważny token zaproszenia lub resetu, błędne hasło przy usuwaniu konta, niepoprawna wartość parametru zapytania lub nieznana wartość enuma w treści żądania | brak tokenu, link wygasły, `?size=500`, `{"status":"DELETED"}` |
+| `401` | Brak/nieważny token JWT, błędne dane logowania, token konta **wyłączonego lub usuniętego** | żądanie bez nagłówka `Authorization`; token sprzed dezaktywacji konta |
+| `403` | Brak uprawnień do zasobu; usunięcie lub wyłączenie ostatniego aktywnego administratora; wyłączenie własnego konta | USER na endpoincie ADMIN |
 | `404` | Zasób nie istnieje | `GET /training-plans/9999` |
 | `409` | Konflikt danych | adres ma już konto, unieważnienie wykorzystanego zaproszenia |
 | `500` | Nieoczekiwany błąd serwera | — |
@@ -438,7 +469,8 @@ Przy błędach walidacji odpowiedź zawiera dodatkowo mapę `errors` z komunikat
 - **Rozróżnienie 401 / 403.** `401` oznacza „nie wiem, kim jesteś" — brak tokenu, token wygasły lub błędne dane logowania. `403` oznacza „wiem, kim jesteś, ale nie wolno ci". Żądanie bez tokenu na chroniony endpoint zwraca `401` z ciałem JSON, nie puste `403`.
 - **Nieważny token to `400`, nie `404`** — z komunikatem rozróżniającym przypadki („nie istnieje", „wygasło", „zostało już wykorzystane", „zostało unieważnione"). Frontend wyświetla `message` z odpowiedzi.
 - **Komunikaty nie zdradzają istnienia kont.** Logowanie zwraca ten sam tekst dla nieistniejącego adresu i złego hasła; żądanie resetu zwraca `202` niezależnie od tego, czy konto istnieje.
-- **Dwa różne `403`.** `Brak uprawnień` to odmowa autoryzacji — komunikat celowo nic nie mówi. `Nie można usunąć konta ostatniego administratora` to reguła biznesowa — tu komunikat pomaga, bo użytkownik może zaprosić drugiego administratora i spróbować ponownie.
+- **Trzy różne `403`.** `Brak uprawnień` to odmowa autoryzacji — komunikat celowo nic nie mówi. `Nie można usunąć konta ostatniego administratora` i `To ostatnie aktywne konto administratora…` to reguły biznesowe, gdzie komunikat pomaga, bo administrator może zaprosić drugiego i spróbować ponownie. `Nie możesz wyłączyć własnego konta` dotyczy pomyłki w kliknięciu. Każdy przypadek ma własny tekst, bo prowadzi do innej czynności naprawczej.
+- **Token wyłączonego konta to `401`, nie `403`.** Filtr JWT sprawdza stan konta przy każdym żądaniu, więc dezaktywacja odcina dostęp natychmiast, a nie po wygaśnięciu tokenu. Z punktu widzenia frontu to wygaśnięcie sesji — ścieżka odświeżania i tak zakończy się wylogowaniem, bo rotacja też odrzuca nieaktywne konta.
 - **Komunikaty są po polsku** i nadają się do pokazania użytkownikowi bez tłumaczenia.
 
 ---
@@ -447,12 +479,14 @@ Przy błędach walidacji odpowiedź zawiera dodatkowo mapę `errors` z komunikat
 
 | Tabela | Opis |
 |--------|------|
-| `users` | Konta użytkowników (rola USER/ADMIN, `birth_date` typu `DATE`) |
+| `users` | Konta użytkowników (rola USER/ADMIN, `birth_date` typu `DATE`, `is_active`, preferencje przypomnień) |
 | `invitation` | Zaproszenia (`token_hash`, `role`, `expires_at`, `sent_at`, `used_at`, `revoked_at`) |
 | `password_reset_token` | Jednorazowe tokeny resetu hasła (`token_hash`, `expires_at`, `used_at`) |
-| `workout_category` | Słownik kategorii treningów |
-| `training_plan` | Zaplanowane treningi (kalendarz) |
+| `refresh_token` | Tokeny odświeżające (`token_hash`, `expires_at`, `revoked_at`, `replaced_by`, `user_agent`) |
+| `workout_category` | Słownik kategorii treningów (`color`, `icon_name` z zamkniętej listy) |
+| `training_plan` | Zaplanowane treningi (kalendarz, `reminder_sent_at`) |
 | `workout_log` | Dziennik wykonanych treningów (`title`, `performed_date`, `performed_time`) |
+| `goal` | Cele treningowe (`metric`, `target_value`, `start_date`, `end_date`, `achieved_at`, `achieved_value`) |
 | `flyway_schema_history` | Historia migracji — tabela techniczna Flyway |
 
 ### Kluczowe relacje
@@ -492,6 +526,7 @@ Kolejność jest istotna: zaproszenie wykorzystane pozostaje `ACCEPTED` nawet po
 - `idx_workout_log_user_category_performed_date` — `workout_log (user_id, category_id, performed_date)`
 - `idx_invitation_pending_email` — **częściowy indeks unikalny** na `invitation (email) WHERE used_at IS NULL AND revoked_at IS NULL`; gwarantuje jedno oczekujące zaproszenie na adres
 - `idx_password_reset_token_user` — `password_reset_token (user_id)`
+- `idx_training_plan_reminder_pending` — **indeks częściowy** na `training_plan (planned_date) WHERE reminder_sent_at IS NULL AND status = 'PLANNED'`; obsługuje godzinne wyszukiwanie kandydatów do przypomnienia
 
 > Przy tokenach resetu **nie ma** analogicznego indeksu częściowego. Wygaśnięcie nie zmienia żadnej kolumny, więc `WHERE used_at IS NULL` uznawałby wygasły token za wciąż oczekujący i blokował kolejne żądanie na zawsze. Jedno aktywne żądanie zapewnia serwis, kasując poprzednie tokeny.
 
@@ -507,7 +542,7 @@ Kolejność jest istotna: zaproszenie wykorzystane pozostaje `ACCEPTED` nawet po
 ./mvnw test
 ```
 
-Projekt zawiera **190 testów** w trzech warstwach:
+Projekt zawiera **366 testów** w trzech warstwach:
 
 **Testy jednostkowe serwisów** (JUnit 5 + Mockito):
 
@@ -517,6 +552,9 @@ Projekt zawiera **190 testów** w trzech warstwach:
 - Usuwanie konta: potwierdzenie hasłem, ochrona ostatniego administratora, kolejność operacji
 - Zarządzanie profilem i zmiana hasła
 - CRUD kategorii, planów i dziennika z walidacją własności
+- Rotacja tokenów odświeżających: wykrywanie ponownego użycia, wylogowanie, unieważnianie wszystkich sesji
+- Panel administratora: lista kont, dezaktywacja i przywrócenie, dwie blokady z osobnymi komunikatami
+- Zamknięty zestaw ikon kategorii: odrzucenie nazwy spoza listy przez walidację i przez ograniczenie `CHECK`
 
 **Testy kontrolerów** (`@WebMvcTest` + MockMvc) — mapowanie ścieżek, kody odpowiedzi, kontrola roli ADMIN, walidacja żądań.
 
