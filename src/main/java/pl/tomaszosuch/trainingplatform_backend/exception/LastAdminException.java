@@ -5,4 +5,8 @@ public class LastAdminException extends RuntimeException {
     public LastAdminException() {
         super("Nie można usunąć konta ostatniego administratora");
     }
+
+    public LastAdminException(String message) {
+        super(message);
+    }
 }

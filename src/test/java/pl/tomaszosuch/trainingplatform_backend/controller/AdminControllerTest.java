@@ -3,11 +3,14 @@ package pl.tomaszosuch.trainingplatform_backend.controller;
 import static org.hamcrest.Matchers.aMapWithSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -26,9 +29,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -39,6 +44,8 @@ import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.AccountStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.AdminUserSort;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
+import pl.tomaszosuch.trainingplatform_backend.exception.LastAdminException;
+import pl.tomaszosuch.trainingplatform_backend.exception.SelfDeactivationException;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
 import pl.tomaszosuch.trainingplatform_backend.service.AdminUserService;
 
@@ -79,12 +86,24 @@ class AdminControllerTest {
                 .build();
     }
 
-    private static PageResponse<AdminUserResponse> onePage() {
-        AdminUserResponse jan = new AdminUserResponse(
-                2L, "jan@example.com", "Jan", "Kowalski", Role.USER, true,
+    private static AdminUserResponse account(boolean active) {
+        return new AdminUserResponse(
+                2L, "jan@example.com", "Jan", "Kowalski", Role.USER, active,
                 LocalDateTime.of(2026, 3, 1, 10, 0));
-        return new PageResponse<>(List.of(jan), 0, 20, 1, 1);
     }
+
+    private static PageResponse<AdminUserResponse> onePage() {
+        return new PageResponse<>(List.of(account(true)), 0, 20, 1, 1);
+    }
+
+    private static MockHttpServletRequestBuilder patchStatus(Long id, String body) {
+        return patch("/admin/users/{id}/status", id)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body);
+    }
+
+    // --- GET /admin/users (G1) ---
 
     @Test
     @DisplayName("zwraca wyłącznie dane konta — dokładnie siedem pól")
@@ -140,7 +159,7 @@ class AdminControllerTest {
     }
 
     @Test
-    @DisplayName("zwykły użytkownik dostaje 403")
+    @DisplayName("zwykły użytkownik dostaje 403 na liście")
     void shouldReturn403ForRegularUser() throws Exception {
         mockMvc.perform(get("/admin/users").with(user(regularUser)))
                 .andExpect(status().isForbidden());
@@ -163,5 +182,67 @@ class AdminControllerTest {
                 .andExpect(jsonPath("$.status").value(400));
 
         verify(adminUserService, never()).findUsers(any(), any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    @DisplayName("zmiana stanu zwraca konto w tym samym kształcie co lista")
+    void shouldReturnUpdatedAccountInListShape() throws Exception {
+        when(adminUserService.changeStatus(1L, 2L, AccountStatus.INACTIVE)).thenReturn(account(false));
+
+        mockMvc.perform(patchStatus(2L, "{\"status\":\"INACTIVE\"}").with(user(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", aMapWithSize(7)))
+                .andExpect(jsonPath("$.id").value(2))
+                .andExpect(jsonPath("$.active").value(false));
+    }
+
+    @Test
+    @DisplayName("zwykły użytkownik dostaje 403 przy zmianie stanu")
+    void shouldReturn403WhenRegularUserChangesStatus() throws Exception {
+        mockMvc.perform(patchStatus(5L, "{\"status\":\"INACTIVE\"}").with(user(regularUser)))
+                .andExpect(status().isForbidden());
+
+        verify(adminUserService, never()).changeStatus(anyLong(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("brak statusu daje 400 z błędem pola")
+    void shouldReturn400WhenStatusMissing() throws Exception {
+        mockMvc.perform(patchStatus(2L, "{}").with(user(admin)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.status").value("Status jest wymagany"));
+    }
+
+    @Test
+    @DisplayName("nieznana wartość statusu daje 400, nie 500")
+    void shouldReturn400ForUnknownStatus() throws Exception {
+        mockMvc.perform(patchStatus(2L, "{\"status\":\"DELETED\"}").with(user(admin)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+
+        verify(adminUserService, never()).changeStatus(anyLong(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("wyłączenie własnego konta: 403 z komunikatem o własnym koncie")
+    void shouldReturn403ForSelfDeactivation() throws Exception {
+        when(adminUserService.changeStatus(1L, 1L, AccountStatus.INACTIVE))
+                .thenThrow(new SelfDeactivationException());
+
+        mockMvc.perform(patchStatus(1L, "{\"status\":\"INACTIVE\"}").with(user(admin)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Nie możesz wyłączyć własnego konta"));
+    }
+
+    @Test
+    @DisplayName("wyłączenie ostatniego administratora: 403 z komunikatem o ostatnim koncie")
+    void shouldReturn403ForLastActiveAdmin() throws Exception {
+        String message = "To ostatnie aktywne konto administratora — po jego wyłączeniu nikt nie odzyska dostępu do panelu";
+        when(adminUserService.changeStatus(1L, 3L, AccountStatus.INACTIVE))
+                .thenThrow(new LastAdminException(message));
+
+        mockMvc.perform(patchStatus(3L, "{\"status\":\"INACTIVE\"}").with(user(admin)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(message));
     }
 }

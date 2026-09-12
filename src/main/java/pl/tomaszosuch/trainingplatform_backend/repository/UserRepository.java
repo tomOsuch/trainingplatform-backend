@@ -14,8 +14,11 @@ import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
+
     boolean existsByEmail(String email);
+
     boolean existsByRole(Role role);
+
     long countByRole(Role role);
 
     @Query("""
@@ -27,5 +30,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> findForAdmin(@Param("pattern") String pattern,
                             @Param("activeStates") Collection<Boolean> activeStates,
                             Pageable pageable);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role = :role AND u.isActive = true")
+    long countActiveByRole(@Param("role") Role role);
 
 }
