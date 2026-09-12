@@ -11,6 +11,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import pl.tomaszosuch.trainingplatform_backend.enums.CategoryIcon;
 
 @Entity
 @Getter
@@ -31,6 +32,8 @@ public class WorkoutCategory {
     @Column(length = 7)
     private String color;
 
-    private String iconName;
+    @Column(name = "icon_name", nullable = false, length = 255)
+    @Builder.Default
+    private String iconName = CategoryIcon.DEFAULT.value();
 
 }

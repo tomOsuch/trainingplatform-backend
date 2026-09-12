@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
+import pl.tomaszosuch.trainingplatform_backend.enums.CategoryIcon;
 import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutCategoryRepository;
 
 @Slf4j
@@ -23,12 +24,12 @@ public class DataInitializer implements CommandLineRunner {
             log.info("Inicjalizacja domyślnych kategorii treningów...");
 
             List<WorkoutCategory> defaults = List.of(
-                WorkoutCategory.builder()
-                    .name("Taniec").color("#9B59B6").iconName("dance").build(),
-                WorkoutCategory.builder()
-                    .name("Gimnastyka").color("#E74C3C").iconName("gymnastics").build(),
-                WorkoutCategory.builder()
-                    .name("Ogólnorozwojowy").color("#27AE60").iconName("fitness").build()
+                    WorkoutCategory.builder()
+                            .name("Taniec").color("#9B59B6").iconName(CategoryIcon.MUSIC.value()).build(),
+                    WorkoutCategory.builder()
+                            .name("Gimnastyka").color("#E74C3C").iconName(CategoryIcon.PERSON_STANDING.value()).build(),
+                    WorkoutCategory.builder()
+                            .name("Ogólnorozwojowy").color("#27AE60").iconName(CategoryIcon.DUMBBELL.value()).build()
             );
 
             workoutCategoryRepository.saveAll(defaults);

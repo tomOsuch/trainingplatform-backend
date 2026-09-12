@@ -52,7 +52,7 @@ public class WorkoutCategoryControllerTest {
 
     @BeforeEach
     void setUp() {
-        categoryResponse = new WorkoutCategoryResponse(1L, "Taniec", "#9B59B6", "dance");
+        categoryResponse = new WorkoutCategoryResponse(1L, "Taniec", "#9B59B6", "music");
 
     }
 
@@ -69,7 +69,7 @@ public class WorkoutCategoryControllerTest {
                 .andExpect(jsonPath("$[0].id").value(1L))
                 .andExpect(jsonPath("$[0].name").value("Taniec"))
                 .andExpect(jsonPath("$[0].color").value("#9B59B6"))
-                .andExpect(jsonPath("$[0].iconName").value("dance"));
+                .andExpect(jsonPath("$[0].iconName").value("music"));
     }
 
     @Test
@@ -93,7 +93,7 @@ public class WorkoutCategoryControllerTest {
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.name").value("Taniec"))
                 .andExpect(jsonPath("$.color").value("#9B59B6"))
-                .andExpect(jsonPath("$.iconName").value("dance"));
+                .andExpect(jsonPath("$.iconName").value("music"));
     }
 
     @Test
@@ -102,21 +102,21 @@ public class WorkoutCategoryControllerTest {
     void shouldReturn201WhenAdminCreatesCategory() throws Exception {
         // given
         WorkoutCategoryRequest request = new WorkoutCategoryRequest(
-                "Joga", "#3498DB", "yoga");
+                "Joga", "#3498DB", "person-standing");
 
         when(workoutCategoryService.createCategory(any(WorkoutCategoryRequest.class)))
                 .thenReturn(categoryResponse);
 
         // when & then
         mockMvc.perform(post("/workout-categories")
-                .with(csrf())
-                .contentType("application/json")
-                .content(new ObjectMapper().writeValueAsString(request)))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(new ObjectMapper().writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.name").value("Taniec"))
                 .andExpect(jsonPath("$.color").value("#9B59B6"))
-                .andExpect(jsonPath("$.iconName").value("dance"));
+                .andExpect(jsonPath("$.iconName").value("music"));
 
         verify(workoutCategoryService).createCategory(any(WorkoutCategoryRequest.class));
     }
@@ -127,13 +127,13 @@ public class WorkoutCategoryControllerTest {
     void shouldReturn403WhenUserTriesToCreateCategory() throws Exception {
         // given
         WorkoutCategoryRequest request = new WorkoutCategoryRequest(
-                "Joga", "#3498DB", "yoga");
+                "Joga", "#3498DB", "person-standing");
 
         // when & then
         mockMvc.perform(post("/workout-categories")
-                .with(csrf())
-                .contentType("application/json")
-                .content(new ObjectMapper().writeValueAsString(request)))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(new ObjectMapper().writeValueAsString(request)))
                 .andExpect(status().isForbidden());
 
         verify(workoutCategoryService, never()).createCategory(any(WorkoutCategoryRequest.class));
@@ -145,13 +145,13 @@ public class WorkoutCategoryControllerTest {
     void shouldReturn400WhenNameIsEmpty() throws Exception {
         // given
         WorkoutCategoryRequest request = new WorkoutCategoryRequest(
-                "", "#3498DB", "yoga");
+                "", "#3498DB", "person-standing");
 
         // when & then
         mockMvc.perform(post("/workout-categories")
-                .with(csrf())
-                .contentType("application/json")
-                .content(new ObjectMapper().writeValueAsString(request)))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content(new ObjectMapper().writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
 
         verify(workoutCategoryService, never()).createCategory(any(WorkoutCategoryRequest.class));
@@ -163,15 +163,50 @@ public class WorkoutCategoryControllerTest {
     void shouldReturn400WhenColorIsInvalid() throws Exception {
         // given
         WorkoutCategoryRequest request = new WorkoutCategoryRequest(
-                "Joga", "#12", "yoga");
+                "Joga", "#12", "person-standing");
 
         // when & then
         mockMvc.perform(post("/workout-categories")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.color").exists());
+    }
+
+
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy ikona jest spoza zestawu")
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn400WhenIconIsNotAllowed() throws Exception {
+        WorkoutCategoryRequest request = new WorkoutCategoryRequest(
+                "Joga", "#3498DB", "yoga");
+
+        mockMvc.perform(post("/workout-categories")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.iconName").exists());
+
+        verify(workoutCategoryService, never()).createCategory(any(WorkoutCategoryRequest.class));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy ikona nie została podana")
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn400WhenIconIsMissing() throws Exception {
+        WorkoutCategoryRequest request = new WorkoutCategoryRequest(
+                "Joga", "#3498DB", null);
+
+        mockMvc.perform(post("/workout-categories")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.iconName").value("Ikona kategorii jest wymagana"));
+
+        verify(workoutCategoryService, never()).createCategory(any(WorkoutCategoryRequest.class));
     }
 
     @Test
@@ -179,15 +214,15 @@ public class WorkoutCategoryControllerTest {
     @WithMockUser(roles = "ADMIN")
     void shouldReturn200WhenAdminUpdates() throws Exception {
         WorkoutCategoryRequest request = new WorkoutCategoryRequest(
-                "Taniec nowoczesny", "#9B59B6", "dance");
+                "Taniec nowoczesny", "#9B59B6", "music");
 
         when(workoutCategoryService.updateCategory(eq(1L), any(WorkoutCategoryRequest.class)))
                 .thenReturn(categoryResponse);
 
         mockMvc.perform(put("/workout-categories/1")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
     }
 
@@ -196,12 +231,12 @@ public class WorkoutCategoryControllerTest {
     @WithMockUser(roles = "USER")
     void shouldReturn403WhenRegularUserUpdates() throws Exception {
         WorkoutCategoryRequest request = new WorkoutCategoryRequest(
-                "Taniec", "#9B59B6", "dance");
+                "Taniec", "#9B59B6", "music");
 
         mockMvc.perform(put("/workout-categories/1")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
     }
 
@@ -212,7 +247,7 @@ public class WorkoutCategoryControllerTest {
         doNothing().when(workoutCategoryService).deleteCategory(1L);
 
         mockMvc.perform(delete("/workout-categories/1")
-                .with(csrf()))
+                        .with(csrf()))
                 .andExpect(status().isNoContent());
 
         verify(workoutCategoryService).deleteCategory(1L);
@@ -223,7 +258,7 @@ public class WorkoutCategoryControllerTest {
     @WithMockUser(roles = "USER")
     void shouldReturn403WhenRegularUserDeletes() throws Exception {
         mockMvc.perform(delete("/workout-categories/1")
-                .with(csrf()))
+                        .with(csrf()))
                 .andExpect(status().isForbidden());
 
         verify(workoutCategoryService, never()).deleteCategory(any());

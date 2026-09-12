@@ -3,6 +3,7 @@ package pl.tomaszosuch.trainingplatform_backend.dto.request;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import pl.tomaszosuch.trainingplatform_backend.validation.ValidIconName;
 
 public record WorkoutCategoryRequest(
 
@@ -13,7 +14,8 @@ public record WorkoutCategoryRequest(
         @Pattern(regexp = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", message = "Kolor musi być poprawnym kodem HEX, np. #FFFFFF lub #FFF")
         String color,
 
-        @Size(max = 255, message = "Nazwa ikony może mieć maksymalnie 255 znaków")
+        @NotBlank(message = "Ikona kategorii jest wymagana")
+        @ValidIconName
         String iconName
 ) {
 
