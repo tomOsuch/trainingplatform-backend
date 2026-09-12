@@ -301,13 +301,14 @@ public class ProfileServiceImplTest {
 
             when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
             when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
-            when(userRepository.countByRole(Role.ADMIN)).thenReturn(1L);
+            when(userRepository.countActiveByRole(Role.ADMIN)).thenReturn(1L);
 
             assertThrows(LastAdminException.class,
                     () -> profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD)));
 
             verify(userRepository, never()).delete(any(User.class));
             verify(invitationRepository, never()).revokePendingByInviter(anyLong(), any());
+            verify(userRepository, never()).countByRole(any(Role.class));
         }
 
         @Test
@@ -317,7 +318,7 @@ public class ProfileServiceImplTest {
 
             when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
             when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
-            when(userRepository.countByRole(Role.ADMIN)).thenReturn(2L);
+            when(userRepository.countActiveByRole(Role.ADMIN)).thenReturn(2L);
 
             profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD));
 
@@ -332,7 +333,7 @@ public class ProfileServiceImplTest {
 
             profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD));
 
-            verify(userRepository, never()).countByRole(any(Role.class));
+            verify(userRepository, never()).countActiveByRole(any(Role.class));
         }
 
         @Test
@@ -346,7 +347,7 @@ public class ProfileServiceImplTest {
             assertThrows(IllegalArgumentException.class,
                     () -> profileService.deleteAccount(3L, new DeleteAccountRequest("ZleHaslo")));
 
-            verify(userRepository, never()).countByRole(any(Role.class));
+            verify(userRepository, never()).countActiveByRole(any(Role.class));
         }
 
         @Test
