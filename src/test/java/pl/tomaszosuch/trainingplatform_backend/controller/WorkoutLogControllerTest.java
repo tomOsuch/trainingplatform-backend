@@ -69,7 +69,7 @@ public class WorkoutLogControllerTest {
                 .build();
 
         logResponse = new WorkoutLogResponse(
-                10L, null, 5L, "Taniec", "#9B59B6", null,
+                10L, null, 5L, "Taniec", "#9B59B6", "music", null,
                 LocalDate.now(), null, 60, 7, "dobry trening");
 
         validRequest = new WorkoutLogRequest(
@@ -88,6 +88,7 @@ public class WorkoutLogControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(10L))
                 .andExpect(jsonPath("$[0].categoryName").value("Taniec"))
+                .andExpect(jsonPath("$[0].categoryIconName").value("music"))
                 .andExpect(jsonPath("$[0].intensity").value(7));
 
         verify(logService).getUserLogs(1L, null, null, null);

@@ -58,8 +58,8 @@ class WorkoutStatsQueryTest {
     void setUp() {
         user = em.persist(user("stats@example.com"));
         otherUser = em.persist(user("other@example.com"));
-        dance = em.persist(WorkoutCategory.builder().name("Taniec").color("#9B59B6").build());
-        gym = em.persist(WorkoutCategory.builder().name("Siłownia").color("#E67E22").build());
+        dance = em.persist(WorkoutCategory.builder().name("Taniec").color("#9B59B6").iconName("music").build());
+        gym = em.persist(WorkoutCategory.builder().name("Siłownia").color("#E67E22").iconName("dumbbell").build());
     }
 
     private static User user(String email) {
@@ -96,7 +96,7 @@ class WorkoutStatsQueryTest {
     }
 
     @Test
-    @DisplayName("rozbicie sumuje się do wartości łącznych i niesie kolor kategorii")
+    @DisplayName("rozbicie sumuje się do wartości łącznych i niesie kolor oraz ikonę kategorii")
     void shouldSplitByCategoryWithColor() {
         log(user, dance, LocalDate.of(2026, 3, 5), 90);
         log(user, dance, LocalDate.of(2026, 3, 7), 60);
@@ -107,6 +107,10 @@ class WorkoutStatsQueryTest {
         assertEquals(150L, rows.get(dance.getId()).getMinutes());
         assertEquals(2L, rows.get(dance.getId()).getSessions());
         assertEquals("#9B59B6", rows.get(dance.getId()).getCategoryColor());
+        // Ikona idzie tą samą drogą co kolor: SELECT plus GROUP BY. Brak kolumny
+        // w GROUP BY nie wysadziłby startu aplikacji, tylko to zapytanie.
+        assertEquals("music", rows.get(dance.getId()).getCategoryIconName());
+        assertEquals("dumbbell", rows.get(gym.getId()).getCategoryIconName());
         assertEquals(45L, rows.get(gym.getId()).getMinutes());
 
         long totalMinutes = rows.values().stream().mapToLong(CategoryStatsView::getMinutes).sum();

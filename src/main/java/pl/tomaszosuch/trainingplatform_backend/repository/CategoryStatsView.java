@@ -8,6 +8,8 @@ public interface CategoryStatsView {
 
     String getCategoryColor();
 
+    String getCategoryIconName();
+
     Long getSessions();
 
     Long getMinutes();

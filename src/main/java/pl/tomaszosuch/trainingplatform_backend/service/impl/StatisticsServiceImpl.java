@@ -45,6 +45,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                         row.getCategoryId(),
                         row.getCategoryName(),
                         row.getCategoryColor(),
+                        row.getCategoryIconName(),
                         row.getSessions(),
                         row.getMinutes()))
                 .sorted(MOST_SIGNIFICANT_FIRST)

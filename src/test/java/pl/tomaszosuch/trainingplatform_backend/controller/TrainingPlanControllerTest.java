@@ -73,7 +73,7 @@ public class TrainingPlanControllerTest {
                 .build();
 
         planResponse = new TrainingPlanResponse(
-                10L, "Salsa wieczorna", 5L, "Taniec", "#9B59B6",
+                10L, "Salsa wieczorna", 5L, "Taniec", "#9B59B6", "music",
                 LocalDate.now().plusDays(3), null, 60, null, PlanStatus.PLANNED);
 
         validRequest = new TrainingPlanRequest(
@@ -95,6 +95,7 @@ public class TrainingPlanControllerTest {
                 .andExpect(jsonPath("$[0].categoryId").value(5))
                 .andExpect(jsonPath("$[0].categoryName").value("Taniec"))
                 .andExpect(jsonPath("$[0].categoryColor").value("#9B59B6"))
+                .andExpect(jsonPath("$[0].categoryIconName").value("music"))
                 .andExpect(jsonPath("$[0].plannedDate").value(LocalDate.now().plusDays(3).toString()))
                 .andExpect(jsonPath("$[0].durationMin").value(60))
                 .andExpect(jsonPath("$[0].status").value(PlanStatus.PLANNED.name()));
@@ -114,6 +115,7 @@ public class TrainingPlanControllerTest {
                 .andExpect(jsonPath("$.categoryId").value(5))
                 .andExpect(jsonPath("$.categoryName").value("Taniec"))
                 .andExpect(jsonPath("$.categoryColor").value("#9B59B6"))
+                .andExpect(jsonPath("$.categoryIconName").value("music"))
                 .andExpect(jsonPath("$.plannedDate").value(LocalDate.now().plusDays(3).toString()))
                 .andExpect(jsonPath("$.durationMin").value(60))
                 .andExpect(jsonPath("$.status").value(PlanStatus.PLANNED.name()));

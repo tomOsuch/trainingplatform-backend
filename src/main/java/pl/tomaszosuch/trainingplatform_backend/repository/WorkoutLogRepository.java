@@ -32,6 +32,7 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long>, J
             SELECT c.id AS categoryId,
                    c.name AS categoryName,
                    c.color AS categoryColor,
+                   c.iconName AS categoryIconName,
                    COUNT(l.id) AS sessions,
                    COALESCE(SUM(l.durationMin), 0L) AS minutes
             FROM WorkoutLog l
@@ -39,7 +40,7 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long>, J
             WHERE l.user.id = :userId
               AND l.performedDate >= :from
               AND l.performedDate <= :to
-            GROUP BY c.id, c.name, c.color
+            GROUP BY c.id, c.name, c.color, c.iconName
             """)
     List<CategoryStatsView> aggregateByCategory(@Param("userId") Long userId,
                                                 @Param("from") LocalDate from,

@@ -24,7 +24,7 @@ class StatisticsMapperTest {
     @DisplayName("sesje mapują się na workoutCount, mianownik i procent na pola odpowiedzi")
     void shouldMapNamesAndDerivedFields() {
         WorkoutStatistics stats = new WorkoutStatistics(7, 390,
-                List.of(new CategoryStatistics(5L, "Taniec", "#9B59B6", 4L, 240L)));
+                List.of(new CategoryStatistics(5L, "Taniec", "#9B59B6", "music", 4L, 240L)));
         PlanCompletion completion = new PlanCompletion(6, 2, 3, 4);
 
         StatisticsResponse response = mapper.toResponse(
@@ -34,6 +34,9 @@ class StatisticsMapperTest {
         assertEquals(390, response.totalMinutes());
         assertEquals(4, response.byCategory().get(0).workoutCount());
         assertEquals("#9B59B6", response.byCategory().get(0).categoryColor());
+        // StatisticsMapper odwzorowuje ikonę po zgodności nazw, bez jawnego @Mapping —
+        // ta asercja jest jedynym miejscem, które to potwierdza.
+        assertEquals("music", response.byCategory().get(0).categoryIconName());
         assertEquals(12, response.planCompletion().completionBase());
         assertEquals(50, response.planCompletion().completionRate());
     }
@@ -52,8 +55,8 @@ class StatisticsMapperTest {
     @DisplayName("suma minut i treningów z rozbicia równa się wartościom z poziomu głównego")
     void shouldKeepPartsSummingToWholeInResponse() {
         WorkoutStatistics stats = new WorkoutStatistics(9, 885, List.of(
-                new CategoryStatistics(1L, "Taniec", "#9B59B6", 7L, 705L),
-                new CategoryStatistics(2L, "Gimnastyka", "#E74C3C", 2L, 180L)));
+                new CategoryStatistics(1L, "Taniec", "#9B59B6", "music", 7L, 705L),
+                new CategoryStatistics(2L, "Gimnastyka", "#E74C3C", "person-standing", 2L, 180L)));
 
         StatisticsResponse response = mapper.toResponse(
                 LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), stats, new PlanCompletion(4, 1, 0, 0));

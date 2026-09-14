@@ -48,7 +48,7 @@ class StatisticsServiceImplTest {
     @InjectMocks
     private StatisticsServiceImpl service;
 
-    private static CategoryStatsView row(Long id, String name, String color, long sessions, long minutes) {
+    private static CategoryStatsView row(Long id, String name, String color, String icon, long sessions, long minutes) {
         return new CategoryStatsView() {
             public Long getCategoryId() {
                 return id;
@@ -60,6 +60,10 @@ class StatisticsServiceImplTest {
 
             public String getCategoryColor() {
                 return color;
+            }
+
+            public String getCategoryIconName() {
+                return icon;
             }
 
             public Long getSessions() {
@@ -95,8 +99,8 @@ class StatisticsServiceImplTest {
     @DisplayName("sumy łączne są sumą rozbicia na kategorie")
     void shouldSumTotalsFromBreakdown() {
         when(workoutLogRepository.aggregateByCategory(7L, FROM, TO)).thenReturn(List.of(
-                row(1L, "Taniec", "#9B59B6", 4, 240),
-                row(2L, "Siłownia", "#E67E22", 3, 150)));
+                row(1L, "Taniec", "#9B59B6", "music", 4, 240),
+                row(2L, "Siłownia", "#E67E22", "music", 3, 150)));
 
         WorkoutStatistics stats = service.workoutStatistics(7L, FROM, TO);
 
@@ -109,9 +113,9 @@ class StatisticsServiceImplTest {
     @DisplayName("kategorie sortowane malejąco po minutach, potem po liczbie sesji")
     void shouldSortByMinutesThenSessions() {
         when(workoutLogRepository.aggregateByCategory(7L, FROM, TO)).thenReturn(List.of(
-                row(1L, "Bieganie", "#1ABC9C", 2, 60),
-                row(2L, "Taniec", "#9B59B6", 1, 180),
-                row(3L, "Rozciąganie", "#95A5A6", 5, 60)));
+                row(1L, "Bieganie", "#1ABC9C", "music", 2, 60),
+                row(2L, "Taniec", "#9B59B6", "music", 1, 180),
+                row(3L, "Rozciąganie", "#95A5A6", "music", 5, 60)));
 
         List<CategoryStatistics> byCategory = service.workoutStatistics(7L, FROM, TO).byCategory();
 
@@ -124,8 +128,8 @@ class StatisticsServiceImplTest {
     @DisplayName("przy równych minutach i sesjach decyduje nazwa")
     void shouldFallBackToNameForStableOrder() {
         when(workoutLogRepository.aggregateByCategory(7L, FROM, TO)).thenReturn(List.of(
-                row(1L, "Zumba", "#111111", 2, 60),
-                row(2L, "Aqua aerobik", "#222222", 2, 60)));
+                row(1L, "Zumba", "#111111", "music", 2, 60),
+                row(2L, "Aqua aerobik", "#222222", "music", 2, 60)));
 
         List<CategoryStatistics> byCategory = service.workoutStatistics(7L, FROM, TO).byCategory();
 
@@ -149,9 +153,10 @@ class StatisticsServiceImplTest {
     @DisplayName("kolor kategorii trafia do wyniku")
     void shouldCarryCategoryColor() {
         when(workoutLogRepository.aggregateByCategory(7L, FROM, TO))
-                .thenReturn(List.of(row(1L, "Taniec", "#9B59B6", 1, 60)));
+                .thenReturn(List.of(row(1L, "Taniec", "#9B59B6", "music", 1, 60)));
 
         assertEquals("#9B59B6", service.workoutStatistics(7L, FROM, TO).byCategory().get(0).categoryColor());
+        assertEquals("music", service.workoutStatistics(7L, FROM, TO).byCategory().get(0).categoryIconName());
     }
 
     @Test
@@ -252,7 +257,7 @@ class StatisticsServiceImplTest {
     @DisplayName("statistics składa agregaty dziennika i realizację planu w jedną odpowiedź")
     void shouldComposeBothParts() {
         when(workoutLogRepository.aggregateByCategory(7L, FROM, TO))
-                .thenReturn(List.of(row(5L, "Taniec", "#9B59B6", 4, 240)));
+                .thenReturn(List.of(row(5L, "Taniec", "#9B59B6", "music", 4, 240)));
         givenPlanCounts(Map.of(PlanStatus.COMPLETED, 6L, PlanStatus.PLANNED, 2L));
 
         service.statistics(7L, FROM, TO);

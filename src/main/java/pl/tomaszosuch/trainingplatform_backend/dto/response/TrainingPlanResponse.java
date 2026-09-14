@@ -12,6 +12,7 @@ public record TrainingPlanResponse(
     Long categoryId,
     String categoryName,
     String categoryColor,
+    String categoryIconName,
     LocalDate plannedDate,
     LocalTime plannedTime,
     Integer durationMin,

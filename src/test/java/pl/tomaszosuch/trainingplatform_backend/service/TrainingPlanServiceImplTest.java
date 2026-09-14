@@ -99,7 +99,7 @@ public class TrainingPlanServiceImplTest {
                 .build();
 
         planResponse = new TrainingPlanResponse(
-                PLAN_ID, "Salsa wieczorna", CATEGORY_ID, "Taniec", "#9B59B6",
+                PLAN_ID, "Salsa wieczorna", CATEGORY_ID, "Taniec", "#9B59B6", "music",
                 LocalDate.now().plusDays(3), null, 60, null, PlanStatus.PLANNED);
     }
 
