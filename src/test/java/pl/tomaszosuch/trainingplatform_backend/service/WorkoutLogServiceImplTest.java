@@ -111,7 +111,7 @@ public class WorkoutLogServiceImplTest {
                 .build();
 
         logResponse = new WorkoutLogResponse(
-                LOG_ID, null, CATEGORY_ID, "Taniec", "#9B59B6", null,
+                LOG_ID, null, CATEGORY_ID, "Taniec", "#9B59B6", "music", null,
                 LocalDate.now(), null, 60, 7, null);
     }
 

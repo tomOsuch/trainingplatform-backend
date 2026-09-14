@@ -90,19 +90,19 @@ class GoalControllerTest {
                 .build();
 
         goalResponse = new GoalResponse(
-                10L, "100 godzin tańca", null, 5L, "Taniec", "#9B59B6",
+                10L, "100 godzin tańca", null, 5L, "Taniec", "#9B59B6", "music",
                 GoalMetric.MINUTES, 6000, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
                 1500L, 25, false, false, null);
 
         detailsResponse = new GoalDetailsResponse(
                 goalResponse.id(), goalResponse.title(), goalResponse.description(),
-                goalResponse.categoryId(), goalResponse.categoryName(), goalResponse.categoryColor(),
+                goalResponse.categoryId(), goalResponse.categoryName(), goalResponse.categoryColor(), goalResponse.categoryIconName(),
                 goalResponse.metric(), goalResponse.targetValue(), goalResponse.startDate(),
                 goalResponse.endDate(), goalResponse.currentValue(), goalResponse.percent(),
                 goalResponse.targetReached(), goalResponse.achieved(), goalResponse.achievedAt(),
                 List.of(
-                        new GoalLogEntryResponse(31L, "Salsa", LocalDate.of(2026, 3, 10), 60, 5L, "Taniec", "#9B59B6"),
-                        new GoalLogEntryResponse(30L, null, LocalDate.of(2026, 3, 1), 45, 5L, "Taniec", "#9B59B6")));
+                        new GoalLogEntryResponse(31L, "Salsa", LocalDate.of(2026, 3, 10), 60, 5L, "Taniec", "#9B59B6", "music"),
+                        new GoalLogEntryResponse(30L, null, LocalDate.of(2026, 3, 1), 45, 5L, "Taniec", "#9B59B6", "music")));
 
         validRequest = new GoalRequest(
                 "100 godzin tańca", null, 5L, GoalMetric.MINUTES, 6000,
@@ -120,6 +120,7 @@ class GoalControllerTest {
                 .andExpect(jsonPath("$[0].metric").value("MINUTES"))
                 .andExpect(jsonPath("$[0].currentValue").value(1500))
                 .andExpect(jsonPath("$[0].percent").value(25))
+                .andExpect(jsonPath("$[0].categoryIconName").value("music"))
                 .andExpect(jsonPath("$[0].achieved").value(false));
     }
 
@@ -287,7 +288,7 @@ class GoalControllerTest {
     @DisplayName("odpowiedź zawiera wyliczoną flagę targetReached")
     void shouldExposeTargetReachedFlag() throws Exception {
         GoalResponse reached = new GoalResponse(
-                10L, "100 godzin tańca", null, 5L, "Taniec", "#9B59B6",
+                10L, "100 godzin tańca", null, 5L, "Taniec", "#9B59B6", "music",
                 GoalMetric.MINUTES, 6000, LocalDate.of(2026, 1, 1), null,
                 6100L, 100, true, false, null);
         when(goalService.getGoals(eq(1L), isNull())).thenReturn(List.of(reached));
@@ -312,7 +313,8 @@ class GoalControllerTest {
                 .andExpect(jsonPath("$.currentValue").value(1500))
                 .andExpect(jsonPath("$.entries.length()").value(2))
                 .andExpect(jsonPath("$.entries[0].id").value(31))
-                .andExpect(jsonPath("$.entries[0].categoryName").value("Taniec"));
+                .andExpect(jsonPath("$.entries[0].categoryName").value("Taniec"))
+                .andExpect(jsonPath("$.entries[0].categoryIconName").value("music"));
     }
 
     @Test

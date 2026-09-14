@@ -21,18 +21,19 @@ public interface GoalMapper {
     @Mapping(target = "categoryId", source = "goal.category.id")
     @Mapping(target = "categoryName", source = "goal.category.name")
     @Mapping(target = "categoryColor", source = "goal.category.color")
+    @Mapping(target = "categoryIconName", source = "goal.category.iconName")
     @Mapping(target = "currentValue", source = "progress.currentValue")
     @Mapping(target = "percent", expression = "java(progress.percent())")
     @Mapping(target = "targetReached", expression = "java(progress.targetReached())")
     @Mapping(target = "achieved", source = "goal.achieved")
     GoalResponse toResponse(Goal goal, GoalProgress progress);
 
-    // Te same odwzorowania co wyżej plus entries — wpisy mapuje toLogEntry, element po elemencie.
     @Mapping(target = "id", source = "goal.id")
     @Mapping(target = "targetValue", source = "goal.targetValue")
     @Mapping(target = "categoryId", source = "goal.category.id")
     @Mapping(target = "categoryName", source = "goal.category.name")
     @Mapping(target = "categoryColor", source = "goal.category.color")
+    @Mapping(target = "categoryIconName", source = "goal.category.iconName")
     @Mapping(target = "currentValue", source = "progress.currentValue")
     @Mapping(target = "percent", expression = "java(progress.percent())")
     @Mapping(target = "targetReached", expression = "java(progress.targetReached())")
@@ -43,6 +44,7 @@ public interface GoalMapper {
     @Mapping(target = "categoryId", source = "category.id")
     @Mapping(target = "categoryName", source = "category.name")
     @Mapping(target = "categoryColor", source = "category.color")
+    @Mapping(target = "categoryIconName", source = "category.iconName")
     GoalLogEntryResponse toLogEntry(WorkoutLog log);
 
 }

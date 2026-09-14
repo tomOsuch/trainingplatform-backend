@@ -9,6 +9,7 @@ public record WorkoutLogResponse(
         Long categoryId,
         String categoryName,
         String categoryColor,
+        String categoryIconName,
         Long planId,
         LocalDate performedDate,
         LocalTime performedTime,

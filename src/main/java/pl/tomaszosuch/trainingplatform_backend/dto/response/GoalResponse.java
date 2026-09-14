@@ -12,6 +12,7 @@ public record GoalResponse(
         Long categoryId,
         String categoryName,
         String categoryColor,
+        String categoryIconName,
         GoalMetric metric,
         Integer targetValue,
         LocalDate startDate,

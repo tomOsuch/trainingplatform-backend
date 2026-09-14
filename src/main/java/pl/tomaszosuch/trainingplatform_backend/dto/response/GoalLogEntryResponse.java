@@ -9,6 +9,7 @@ public record GoalLogEntryResponse(
         Integer durationMin,
         Long categoryId,
         String categoryName,
-        String categoryColor
+        String categoryColor,
+        String categoryIconName
 ) {
 }

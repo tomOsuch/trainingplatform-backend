@@ -75,8 +75,8 @@ class StatisticsControllerTest {
 
     private static StatisticsResponse response(LocalDate from, LocalDate to) {
         return new StatisticsResponse(from, to, 7, 390,
-                List.of(new CategoryStatisticsResponse(5L, "Taniec", "#9B59B6", 4, 240),
-                        new CategoryStatisticsResponse(6L, "Siłownia", "#E67E22", 3, 150)),
+                List.of(new CategoryStatisticsResponse(5L, "Taniec", "#9B59B6", "music", 4, 240),
+                        new CategoryStatisticsResponse(6L, "Siłownia", "#E67E22", "dumbbell", 3, 150)),
                 new PlanCompletionResponse(6, 2, 3, 4, 12, 50));
     }
 
@@ -97,6 +97,7 @@ class StatisticsControllerTest {
                 .andExpect(jsonPath("$.byCategory[0].categoryId").value(5))
                 .andExpect(jsonPath("$.byCategory[0].categoryName").value("Taniec"))
                 .andExpect(jsonPath("$.byCategory[0].categoryColor").value("#9B59B6"))
+                .andExpect(jsonPath("$.byCategory[0].categoryIconName").value("music"))
                 .andExpect(jsonPath("$.byCategory[0].workoutCount").value(4))
                 .andExpect(jsonPath("$.byCategory[0].totalMinutes").value(240))
                 .andExpect(jsonPath("$.planCompletion.completed").value(6))
