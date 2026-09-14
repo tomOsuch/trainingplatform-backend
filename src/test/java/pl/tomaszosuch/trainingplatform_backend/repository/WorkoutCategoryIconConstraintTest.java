@@ -15,6 +15,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
 import pl.tomaszosuch.trainingplatform_backend.enums.CategoryIcon;
 
 @Testcontainers
@@ -67,5 +68,24 @@ class WorkoutCategoryIconConstraintTest {
 
         assertEquals(CategoryIcon.DEFAULT.value(), jdbcTemplate.queryForObject(
                 "SELECT icon_name FROM workout_category WHERE name = 'Z domyślną'", String.class));
+    }
+
+
+    @Test
+    @DisplayName("baza odrzuca kolor w zapisie skróconym")
+    void shouldRejectShorthandColor() {
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbcTemplate.update(
+                        "INSERT INTO workout_category (name, color, icon_name) VALUES (?, ?, 'dumbbell')",
+                        "Joga", "#abc"));
+    }
+
+    @Test
+    @DisplayName("wstawienie bez kolumny color bierze wartość domyślną")
+    void shouldApplyDefaultColor() {
+        jdbcTemplate.update("INSERT INTO workout_category (name) VALUES ('Bez koloru')");
+
+        assertEquals(WorkoutCategory.DEFAULT_COLOR, jdbcTemplate.queryForObject(
+                "SELECT color FROM workout_category WHERE name = 'Bez koloru'", String.class));
     }
 }

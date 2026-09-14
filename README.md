@@ -366,7 +366,7 @@ Dołączona jest kolekcja **Postman** (`trainingplatform.postman_collection.json
 
 > `POST /workout-categories` zwraca `201 Created`. Endpoint jest dostępny wyłącznie dla roli ADMIN; kategorie startowe zakłada `DataInitializer` przy pierwszym uruchomieniu.
 >
-> `iconName` jest **wymagane** i musi należeć do zamkniętego zestawu nazw ikon `lucide-react`: `dumbbell`, `footprints`, `volleyball`, `trophy`, `bike`, `waves`, `heart-pulse`, `activity`, `flame`, `mountain`, `music`, `target`, `timer`, `medal`, `zap`, `person-standing`. Zestaw żyje w enumie `CategoryIcon` i jest pilnowany dwukrotnie: walidacją żądania (`400` z listą dozwolonych nazw) oraz ograniczeniem `CHECK` w bazie. Nazwa spoza listy nie wejdzie żadną drogą, bo literówka dawałaby pustą dziurę w kalendarzu bez żadnego błędu.
+> `iconName` jest **wymagane** i musi należeć do zamkniętego zestawu nazw ikon `lucide-react`: `dumbbell`, `footprints`, `volleyball`, `trophy`, `bike`, `waves-horizontal`, `heart-pulse`, `activity`, `flame`, `mountain`, `music`, `target`, `timer`, `medal`, `zap`, `person-standing`. Zestaw żyje w enumie `CategoryIcon` i jest pilnowany dwukrotnie: walidacją żądania (`400` z listą dozwolonych nazw) oraz ograniczeniem `CHECK` w bazie. Nazwa spoza listy nie wejdzie żadną drogą, bo literówka dawałaby pustą dziurę w kalendarzu bez żadnego błędu.
 
 ### Plany treningowe (`/training-plans`)
 

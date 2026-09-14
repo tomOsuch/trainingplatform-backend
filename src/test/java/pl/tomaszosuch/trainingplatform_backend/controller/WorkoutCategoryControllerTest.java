@@ -290,4 +290,40 @@ public class WorkoutCategoryControllerTest {
         mockMvc.perform(get("/workout-categories/icons"))
                 .andExpect(status().isUnauthorized());
     }
+
+
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy kolor jest skrótem trzyznakowym")
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn400WhenColorIsShorthand() throws Exception {
+        // #abc przechodziło dawną walidację i gasiło kategorię w całej aplikacji naraz.
+        WorkoutCategoryRequest request = new WorkoutCategoryRequest(
+                "Joga", "#abc", "person-standing");
+
+        mockMvc.perform(post("/workout-categories")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.color").exists());
+
+        verify(workoutCategoryService, never()).createCategory(any(WorkoutCategoryRequest.class));
+    }
+
+    @Test
+    @DisplayName("powinien zwrócić 400 gdy kolor nie został podany")
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturn400WhenColorIsMissing() throws Exception {
+        WorkoutCategoryRequest request = new WorkoutCategoryRequest(
+                "Joga", null, "person-standing");
+
+        mockMvc.perform(post("/workout-categories")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.color").value("Kolor kategorii jest wymagany"));
+
+        verify(workoutCategoryService, never()).createCategory(any(WorkoutCategoryRequest.class));
+    }
 }

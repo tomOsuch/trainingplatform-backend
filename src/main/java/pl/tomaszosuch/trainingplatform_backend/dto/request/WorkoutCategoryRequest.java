@@ -11,7 +11,8 @@ public record WorkoutCategoryRequest(
         @Size(min = 1, max = 100, message = "Nazwa musi mieć od 1 do 100 znaków")
         String name,
 
-        @Pattern(regexp = "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", message = "Kolor musi być poprawnym kodem HEX, np. #FFFFFF lub #FFF")
+        @NotBlank(message = "Kolor kategorii jest wymagany")
+        @Pattern(regexp = "^#[A-Fa-f0-9]{6}$", message = "Kolor musi być pełnym kodem HEX, np. #9B59B6")
         String color,
 
         @NotBlank(message = "Ikona kategorii jest wymagana")

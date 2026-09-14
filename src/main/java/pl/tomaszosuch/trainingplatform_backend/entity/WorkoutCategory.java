@@ -22,6 +22,8 @@ import pl.tomaszosuch.trainingplatform_backend.enums.CategoryIcon;
 @Table(name = "workout_category")
 public class WorkoutCategory {
 
+    public static final String DEFAULT_COLOR = "#6B7280";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -29,8 +31,9 @@ public class WorkoutCategory {
     @Column(nullable = false, unique = true, length = 100)
     private String name;
 
-    @Column(length = 7)
-    private String color;
+    @Column(length = 7, nullable = false)
+    @Builder.Default
+    private String color = DEFAULT_COLOR;
 
     @Column(name = "icon_name", nullable = false, length = 255)
     @Builder.Default

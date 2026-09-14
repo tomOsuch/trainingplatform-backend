@@ -12,7 +12,7 @@ public enum CategoryIcon {
     VOLLEYBALL("volleyball"),
     TROPHY("trophy"),
     BIKE("bike"),
-    WAVES("waves"),
+    WAVES_HORIZONTAL("waves-horizontal"),
     HEART_PULSE("heart-pulse"),
     ACTIVITY("activity"),
     FLAME("flame"),
