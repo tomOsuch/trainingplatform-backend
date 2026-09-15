@@ -11,10 +11,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.response.WorkoutCategoryRespo
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
 import pl.tomaszosuch.trainingplatform_backend.exception.WorkoutCategoryNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.WorkoutCategoryMapper;
-import pl.tomaszosuch.trainingplatform_backend.repository.GoalRepository;
-import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
-import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutCategoryRepository;
-import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutLogRepository;
+import pl.tomaszosuch.trainingplatform_backend.repository.*;
 import pl.tomaszosuch.trainingplatform_backend.service.WorkoutCategoryService;
 
 @Service
@@ -27,6 +24,7 @@ public class WorkoutCategoryServiceImpl implements WorkoutCategoryService {
     private final TrainingPlanRepository trainingPlanRepository;
     private final WorkoutLogRepository workoutLogRepository;
     private final GoalRepository goalRepository;
+    private final WorkoutTemplateRepository workoutTemplateRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -100,6 +98,11 @@ public class WorkoutCategoryServiceImpl implements WorkoutCategoryService {
         if (goalRepository.existsByCategoryId(id)) {
             throw new IllegalArgumentException(
                     "Nie można usunąć kategorii, która jest używana przez cele");
+        }
+
+        if (workoutTemplateRepository.existsByCategoryId(id)) {
+            throw new IllegalArgumentException(
+                    "Nie można usunąć kategorii, która jest używana przez szablony treningów");
         }
 
         workoutCategoryRepository.delete(category);
