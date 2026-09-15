@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.StatisticsResponse;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.WeeklyStatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.service.StatisticsService;
 
@@ -44,4 +45,13 @@ public class StatisticsController {
 
         return ResponseEntity.ok(statisticsService.statistics(currentUser.getId(), rangeFrom, rangeTo));
     }
+
+    @GetMapping("/weekly")
+    public ResponseEntity<WeeklyStatisticsResponse> getWeeklyStatistics(
+            @AuthenticationPrincipal User currentUser,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(statisticsService.weeklyStatistics(currentUser.getId(), from, to));
+    }
+
 }

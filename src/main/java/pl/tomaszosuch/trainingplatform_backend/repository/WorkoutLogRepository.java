@@ -46,4 +46,19 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long>, J
                                                 @Param("from") LocalDate from,
                                                 @Param("to") LocalDate to);
 
+    @Query("""
+            SELECT l.performedDate AS day,
+                   COUNT(l.id) AS sessions,
+                   COALESCE(SUM(l.durationMin), 0L) AS minutes
+            FROM WorkoutLog l
+            WHERE l.user.id = :userId
+              AND l.performedDate >= :from
+              AND l.performedDate <= :to
+            GROUP BY l.performedDate
+            ORDER BY l.performedDate
+            """)
+    List<DailyStatsView> aggregateByDay(@Param("userId") Long userId,
+                                        @Param("from") LocalDate from,
+                                        @Param("to") LocalDate to);
+
 }
