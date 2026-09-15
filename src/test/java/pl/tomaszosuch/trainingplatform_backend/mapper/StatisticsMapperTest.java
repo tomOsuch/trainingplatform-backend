@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.CategoryStatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.StatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.service.model.CategoryStatistics;
-import pl.tomaszosuch.trainingplatform_backend.service.model.IntensitySummary;
+import pl.tomaszosuch.trainingplatform_backend.service.model.PeriodSummary;
 import pl.tomaszosuch.trainingplatform_backend.service.model.PlanCompletion;
 import pl.tomaszosuch.trainingplatform_backend.service.model.WorkoutStatistics;
 
@@ -30,7 +30,7 @@ class StatisticsMapperTest {
         PlanCompletion completion = new PlanCompletion(6, 2, 3, 4);
 
         StatisticsResponse response = mapper.toResponse(
-                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31), stats, completion, new IntensitySummary(7, 4, 34));
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31), stats, completion, new PeriodSummary(7, 4, 34, 5));
 
         assertEquals(7, response.workoutCount());
         assertEquals(390, response.totalMinutes());
@@ -46,7 +46,7 @@ class StatisticsMapperTest {
     void shouldMapNullRate() {
         StatisticsResponse response = mapper.toResponse(
                 LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31),
-                new WorkoutStatistics(0, 0, List.of()), new PlanCompletion(0, 0, 0, 0), new IntensitySummary(0, 0, 0));
+                new WorkoutStatistics(0, 0, List.of()), new PlanCompletion(0, 0, 0, 0), new PeriodSummary(0, 0, 0, 0));
 
         assertNull(response.planCompletion().completionRate());
         assertNull(response.intensity().average());
@@ -60,7 +60,7 @@ class StatisticsMapperTest {
                 new CategoryStatistics(2L, "Gimnastyka", "#E74C3C", "person-standing", 2L, 180L)));
 
         StatisticsResponse response = mapper.toResponse(
-                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), stats, new PlanCompletion(4, 1, 0, 0), new IntensitySummary(9, 5, 40));
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), stats, new PlanCompletion(4, 1, 0, 0), new PeriodSummary(9, 5, 40, 6));
 
         long minutesFromParts = response.byCategory().stream()
                 .mapToLong(CategoryStatisticsResponse::totalMinutes).sum();
@@ -78,11 +78,26 @@ class StatisticsMapperTest {
         StatisticsResponse response = mapper.toResponse(
                 LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31),
                 new WorkoutStatistics(20, 1200, List.of()), new PlanCompletion(0, 0, 0, 0),
-                new IntensitySummary(20, 3, 25));
+                new PeriodSummary(20, 3, 25, 12));
 
         assertEquals(new BigDecimal("8.3"), response.intensity().average());
         assertEquals(3, response.intensity().ratedCount());
         assertEquals(20, response.intensity().totalCount());
+    }
+
+
+    @Test
+    @DisplayName("treningi planowane i ad-hoc sumują się do liczby treningów ogółem")
+    void shouldSplitWorkoutsIntoPlannedAndAdHoc() {
+        StatisticsResponse response = mapper.toResponse(
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31),
+                new WorkoutStatistics(9, 885, List.of()), new PlanCompletion(0, 0, 0, 0),
+                new PeriodSummary(9, 0, 0, 6));
+
+        // Wartości celowo różne — przestawienie argumentów w konstruktorze DTO tu się wysypie.
+        assertEquals(6, response.plannedCount());
+        assertEquals(3, response.adHocCount());
+        assertEquals(response.workoutCount(), response.plannedCount() + response.adHocCount());
     }
 
 }

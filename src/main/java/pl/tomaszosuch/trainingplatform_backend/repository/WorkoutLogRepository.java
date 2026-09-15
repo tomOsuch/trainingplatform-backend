@@ -64,14 +64,15 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long>, J
     @Query("""
             SELECT COUNT(l.id) AS totalCount,
                    COUNT(l.intensity) AS ratedCount,
-                   COALESCE(SUM(l.intensity), 0L) AS intensitySum
+                   COALESCE(SUM(l.intensity), 0L) AS intensitySum,
+                   COUNT(l.plan.id) AS plannedCount
             FROM WorkoutLog l
             WHERE l.user.id = :userId
               AND l.performedDate >= :from
               AND l.performedDate <= :to
             """)
-    IntensityStatsView aggregateIntensity(@Param("userId") Long userId,
-                                          @Param("from") LocalDate from,
-                                          @Param("to") LocalDate to);
+    PeriodStatsView aggregatePeriod(@Param("userId") Long userId,
+                                    @Param("from") LocalDate from,
+                                    @Param("to") LocalDate to);
 
 }

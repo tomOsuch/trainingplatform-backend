@@ -82,7 +82,7 @@ class StatisticsControllerTest {
                 List.of(new CategoryStatisticsResponse(5L, "Taniec", "#9B59B6", "music", 4, 240),
                         new CategoryStatisticsResponse(6L, "Siłownia", "#E67E22", "dumbbell", 3, 150)),
                 new PlanCompletionResponse(6, 2, 3, 4, 12, 50),
-                new IntensitySummaryResponse(new BigDecimal("8.5"), 4, 7));
+                new IntensitySummaryResponse(new BigDecimal("8.5"), 4, 7), 5, 2);
     }
 
     @Test
@@ -161,7 +161,7 @@ class StatisticsControllerTest {
     void shouldReturnZerosForEmptyPeriod() throws Exception {
         when(statisticsService.statistics(1L, FROM, TO)).thenReturn(new StatisticsResponse(
                 FROM, TO, 0, 0, List.of(), new PlanCompletionResponse(0, 0, 0, 0, 0, null),
-                new IntensitySummaryResponse(null, 0, 0)));
+                new IntensitySummaryResponse(null, 0, 0), 0, 0));
 
         mockMvc.perform(get("/statistics")
                         .param("from", "2026-03-01").param("to", "2026-03-31")
@@ -172,6 +172,8 @@ class StatisticsControllerTest {
                 .andExpect(jsonPath("$.byCategory").isEmpty())
                 .andExpect(jsonPath("$.intensity.average").doesNotExist())
                 .andExpect(jsonPath("$.intensity.ratedCount").value(0))
+                .andExpect(jsonPath("$.plannedCount").value(0))
+                .andExpect(jsonPath("$.adHocCount").value(0))
                 .andExpect(jsonPath("$.planCompletion.completionRate").doesNotExist());
     }
 
@@ -225,5 +227,26 @@ class StatisticsControllerTest {
                 .andExpect(jsonPath("$.intensity.totalCount").value(7));
     }
 
+
+
+    @Test
+    @DisplayName("GET /statistics: planowane i ad-hoc sumują się do całości w samej odpowiedzi")
+    void shouldSplitWorkoutsIntoPlannedAndAdHoc() throws Exception {
+        when(statisticsService.statistics(1L, FROM, TO)).thenReturn(response(FROM, TO));
+
+        String body = mockMvc.perform(get("/statistics")
+                        .param("from", "2026-03-01").param("to", "2026-03-31")
+                        .with(user(currentUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.plannedCount").value(5))
+                .andExpect(jsonPath("$.adHocCount").value(2))
+                .andReturn().getResponse().getContentAsString();
+
+        DocumentContext json = JsonPath.parse(body);
+        int total = json.read("$.workoutCount");
+        int planned = json.read("$.plannedCount");
+        int adHoc = json.read("$.adHocCount");
+        assertEquals(total, planned + adHoc);
+    }
 
 }

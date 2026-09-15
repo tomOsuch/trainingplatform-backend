@@ -69,10 +69,11 @@ public class StatisticsServiceImpl implements StatisticsService {
     }
 
     @Override
-    public IntensitySummary intensitySummary(Long userId, LocalDate from, LocalDate to) {
+    public PeriodSummary periodSummary(Long userId, LocalDate from, LocalDate to) {
         validateRange(from, to);
-        IntensityStatsView row = workoutLogRepository.aggregateIntensity(userId, from, to);
-        return new IntensitySummary(row.getTotalCount(), row.getRatedCount(), row.getIntensitySum());
+        PeriodStatsView row = workoutLogRepository.aggregatePeriod(userId, from, to);
+        return new PeriodSummary(row.getTotalCount(), row.getRatedCount(),
+                row.getIntensitySum(), row.getPlannedCount());
     }
 
     @Override
@@ -81,7 +82,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         return statisticsMapper.toResponse(from, to,
                 workoutStatistics(userId, from, to),
                 planCompletion(userId, from, to),
-                intensitySummary(userId, from, to));
+                periodSummary(userId, from, to));
     }
 
     @Override
