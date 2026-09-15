@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -24,10 +25,7 @@ import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
 import pl.tomaszosuch.trainingplatform_backend.mapper.StatisticsMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.*;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.StatisticsServiceImpl;
-import pl.tomaszosuch.trainingplatform_backend.service.model.CategoryStatistics;
-import pl.tomaszosuch.trainingplatform_backend.service.model.PlanCompletion;
-import pl.tomaszosuch.trainingplatform_backend.service.model.WeeklyStatistics;
-import pl.tomaszosuch.trainingplatform_backend.service.model.WorkoutStatistics;
+import pl.tomaszosuch.trainingplatform_backend.service.model.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("StatisticsServiceImplTest")
@@ -107,6 +105,23 @@ class StatisticsServiceImplTest {
 
             public Long getMinutes() {
                 return minutes;
+            }
+        };
+    }
+
+
+    private static IntensityStatsView intensity(long total, long rated, long sum) {
+        return new IntensityStatsView() {
+            public long getTotalCount() {
+                return total;
+            }
+
+            public long getRatedCount() {
+                return rated;
+            }
+
+            public long getIntensitySum() {
+                return sum;
             }
         };
     }
@@ -281,12 +296,13 @@ class StatisticsServiceImplTest {
     void shouldComposeBothParts() {
         when(workoutLogRepository.aggregateByCategory(7L, FROM, TO))
                 .thenReturn(List.of(row(5L, "Taniec", "#9B59B6", "music", 4, 240)));
+        when(workoutLogRepository.aggregateIntensity(7L, FROM, TO)).thenReturn(intensity(4, 2, 17));
         givenPlanCounts(Map.of(PlanStatus.COMPLETED, 6L, PlanStatus.PLANNED, 2L));
 
         service.statistics(7L, FROM, TO);
 
         verify(statisticsMapper).toResponse(eq(FROM), eq(TO),
-                any(WorkoutStatistics.class), any(PlanCompletion.class));
+                any(WorkoutStatistics.class), any(PlanCompletion.class), any(IntensitySummary.class));
     }
 
     @Test
@@ -297,6 +313,7 @@ class StatisticsServiceImplTest {
         verify(workoutLogRepository, never()).aggregateByCategory(anyLong(), any(), any());
         verify(trainingPlanRepository, never()).countByStatus(anyLong(), any(), any(), any());
         verifyNoInteractions(statisticsMapper);
+        verify(workoutLogRepository, never()).aggregateIntensity(anyLong(), any(), any());
     }
 
     @Test
@@ -346,6 +363,27 @@ class StatisticsServiceImplTest {
                 7L, LocalDate.of(2026, 3, 20), LocalDate.of(2026, 3, 1)));
 
         verify(workoutLogRepository, never()).aggregateByDay(any(), any(), any());
+    }
+
+
+    @Test
+    @DisplayName("okres bez ani jednej oceny nie ma średniej — null, nie zero")
+    void shouldReturnNoAverageWithoutRatings() {
+        when(workoutLogRepository.aggregateIntensity(7L, FROM, TO)).thenReturn(intensity(5, 0, 0));
+
+        IntensitySummary summary = service.intensitySummary(7L, FROM, TO);
+
+        assertNull(summary.average());
+        assertEquals(0L, summary.ratedCount());
+        assertEquals(5L, summary.totalCount());
+    }
+
+    @Test
+    @DisplayName("średnia liczy się wyłącznie z ocenionych treningów")
+    void shouldAverageOnlyRatedWorkouts() {
+        when(workoutLogRepository.aggregateIntensity(7L, FROM, TO)).thenReturn(intensity(20, 4, 34));
+
+        assertEquals(new BigDecimal("8.5"), service.intensitySummary(7L, FROM, TO).average());
     }
 
 }

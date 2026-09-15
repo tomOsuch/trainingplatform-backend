@@ -3,6 +3,7 @@ package pl.tomaszosuch.trainingplatform_backend.mapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.CategoryStatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.StatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.service.model.CategoryStatistics;
+import pl.tomaszosuch.trainingplatform_backend.service.model.IntensitySummary;
 import pl.tomaszosuch.trainingplatform_backend.service.model.PlanCompletion;
 import pl.tomaszosuch.trainingplatform_backend.service.model.WorkoutStatistics;
 
@@ -28,14 +30,12 @@ class StatisticsMapperTest {
         PlanCompletion completion = new PlanCompletion(6, 2, 3, 4);
 
         StatisticsResponse response = mapper.toResponse(
-                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31), stats, completion);
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31), stats, completion, new IntensitySummary(7, 4, 34));
 
         assertEquals(7, response.workoutCount());
         assertEquals(390, response.totalMinutes());
         assertEquals(4, response.byCategory().get(0).workoutCount());
         assertEquals("#9B59B6", response.byCategory().get(0).categoryColor());
-        // StatisticsMapper odwzorowuje ikonę po zgodności nazw, bez jawnego @Mapping —
-        // ta asercja jest jedynym miejscem, które to potwierdza.
         assertEquals("music", response.byCategory().get(0).categoryIconName());
         assertEquals(12, response.planCompletion().completionBase());
         assertEquals(50, response.planCompletion().completionRate());
@@ -46,9 +46,10 @@ class StatisticsMapperTest {
     void shouldMapNullRate() {
         StatisticsResponse response = mapper.toResponse(
                 LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31),
-                new WorkoutStatistics(0, 0, List.of()), new PlanCompletion(0, 0, 0, 0));
+                new WorkoutStatistics(0, 0, List.of()), new PlanCompletion(0, 0, 0, 0), new IntensitySummary(0, 0, 0));
 
         assertNull(response.planCompletion().completionRate());
+        assertNull(response.intensity().average());
     }
 
     @Test
@@ -59,7 +60,7 @@ class StatisticsMapperTest {
                 new CategoryStatistics(2L, "Gimnastyka", "#E74C3C", "person-standing", 2L, 180L)));
 
         StatisticsResponse response = mapper.toResponse(
-                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), stats, new PlanCompletion(4, 1, 0, 0));
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), stats, new PlanCompletion(4, 1, 0, 0), new IntensitySummary(9, 5, 40));
 
         long minutesFromParts = response.byCategory().stream()
                 .mapToLong(CategoryStatisticsResponse::totalMinutes).sum();
@@ -68,6 +69,20 @@ class StatisticsMapperTest {
 
         assertEquals(response.totalMinutes(), minutesFromParts);
         assertEquals(response.workoutCount(), countFromParts);
+    }
+
+
+    @Test
+    @DisplayName("średnia zaokrągla się do jednego miejsca i stoi obok licznika pokrycia")
+    void shouldRoundAverageAndExposeCoverage() {
+        StatisticsResponse response = mapper.toResponse(
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31),
+                new WorkoutStatistics(20, 1200, List.of()), new PlanCompletion(0, 0, 0, 0),
+                new IntensitySummary(20, 3, 25));
+
+        assertEquals(new BigDecimal("8.3"), response.intensity().average());
+        assertEquals(3, response.intensity().ratedCount());
+        assertEquals(20, response.intensity().totalCount());
     }
 
 }
