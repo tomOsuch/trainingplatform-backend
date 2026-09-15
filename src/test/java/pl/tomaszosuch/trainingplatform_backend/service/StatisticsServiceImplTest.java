@@ -110,8 +110,8 @@ class StatisticsServiceImplTest {
     }
 
 
-    private static IntensityStatsView intensity(long total, long rated, long sum) {
-        return new IntensityStatsView() {
+    private static PeriodStatsView period(long total, long rated, long sum, long planned) {
+        return new PeriodStatsView() {
             public long getTotalCount() {
                 return total;
             }
@@ -122,6 +122,10 @@ class StatisticsServiceImplTest {
 
             public long getIntensitySum() {
                 return sum;
+            }
+
+            public long getPlannedCount() {
+                return planned;
             }
         };
     }
@@ -296,13 +300,13 @@ class StatisticsServiceImplTest {
     void shouldComposeBothParts() {
         when(workoutLogRepository.aggregateByCategory(7L, FROM, TO))
                 .thenReturn(List.of(row(5L, "Taniec", "#9B59B6", "music", 4, 240)));
-        when(workoutLogRepository.aggregateIntensity(7L, FROM, TO)).thenReturn(intensity(4, 2, 17));
+        when(workoutLogRepository.aggregatePeriod(7L, FROM, TO)).thenReturn(period(4, 2, 17, 3));
         givenPlanCounts(Map.of(PlanStatus.COMPLETED, 6L, PlanStatus.PLANNED, 2L));
 
         service.statistics(7L, FROM, TO);
 
         verify(statisticsMapper).toResponse(eq(FROM), eq(TO),
-                any(WorkoutStatistics.class), any(PlanCompletion.class), any(IntensitySummary.class));
+                any(WorkoutStatistics.class), any(PlanCompletion.class), any(PeriodSummary.class));
     }
 
     @Test
@@ -313,7 +317,7 @@ class StatisticsServiceImplTest {
         verify(workoutLogRepository, never()).aggregateByCategory(anyLong(), any(), any());
         verify(trainingPlanRepository, never()).countByStatus(anyLong(), any(), any(), any());
         verifyNoInteractions(statisticsMapper);
-        verify(workoutLogRepository, never()).aggregateIntensity(anyLong(), any(), any());
+        verify(workoutLogRepository, never()).aggregatePeriod(anyLong(), any(), any());
     }
 
     @Test
@@ -369,9 +373,9 @@ class StatisticsServiceImplTest {
     @Test
     @DisplayName("okres bez ani jednej oceny nie ma średniej — null, nie zero")
     void shouldReturnNoAverageWithoutRatings() {
-        when(workoutLogRepository.aggregateIntensity(7L, FROM, TO)).thenReturn(intensity(5, 0, 0));
+        when(workoutLogRepository.aggregatePeriod(7L, FROM, TO)).thenReturn(period(5, 0, 0, 2));
 
-        IntensitySummary summary = service.intensitySummary(7L, FROM, TO);
+        IntensitySummary summary = service.periodSummary(7L, FROM, TO).intensity();
 
         assertNull(summary.average());
         assertEquals(0L, summary.ratedCount());
@@ -381,9 +385,21 @@ class StatisticsServiceImplTest {
     @Test
     @DisplayName("średnia liczy się wyłącznie z ocenionych treningów")
     void shouldAverageOnlyRatedWorkouts() {
-        when(workoutLogRepository.aggregateIntensity(7L, FROM, TO)).thenReturn(intensity(20, 4, 34));
+        when(workoutLogRepository.aggregatePeriod(7L, FROM, TO)).thenReturn(period(20, 4, 34, 11));
 
-        assertEquals(new BigDecimal("8.5"), service.intensitySummary(7L, FROM, TO).average());
+        assertEquals(new BigDecimal("8.5"), service.periodSummary(7L, FROM, TO).intensity().average());
+    }
+
+    @Test
+    @DisplayName("treningi bez planu wychodzą jako ad-hoc i domykają sumę")
+    void shouldDeriveAdHocFromPlannedCount() {
+        when(workoutLogRepository.aggregatePeriod(7L, FROM, TO)).thenReturn(period(9, 4, 30, 6));
+
+        PeriodSummary summary = service.periodSummary(7L, FROM, TO);
+
+        assertEquals(6L, summary.plannedCount());
+        assertEquals(3L, summary.adHocCount());
+        assertEquals(summary.totalCount(), summary.plannedCount() + summary.adHocCount());
     }
 
 }

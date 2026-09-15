@@ -10,6 +10,8 @@ public record StatisticsResponse(
         long totalMinutes,
         List<CategoryStatisticsResponse> byCategory,
         PlanCompletionResponse planCompletion,
-        IntensitySummaryResponse intensity
+        IntensitySummaryResponse intensity,
+        long plannedCount,
+        long adHocCount
 ) {
 }

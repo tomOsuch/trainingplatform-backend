@@ -3,6 +3,7 @@ package pl.tomaszosuch.trainingplatform_backend.service;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.StatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.WeeklyStatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.service.model.IntensitySummary;
+import pl.tomaszosuch.trainingplatform_backend.service.model.PeriodSummary;
 import pl.tomaszosuch.trainingplatform_backend.service.model.PlanCompletion;
 import pl.tomaszosuch.trainingplatform_backend.service.model.WorkoutStatistics;
 
@@ -14,7 +15,7 @@ public interface StatisticsService {
 
     PlanCompletion planCompletion(Long userId, LocalDate from, LocalDate to);
 
-    IntensitySummary intensitySummary(Long userId, LocalDate from, LocalDate to);
+    PeriodSummary periodSummary(Long userId, LocalDate from, LocalDate to);
 
     StatisticsResponse statistics(Long userId, LocalDate from, LocalDate to);
 

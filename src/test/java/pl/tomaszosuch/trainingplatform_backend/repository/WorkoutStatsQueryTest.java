@@ -21,9 +21,11 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import pl.tomaszosuch.trainingplatform_backend.entity.TrainingPlan;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutLog;
+import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 
 @Testcontainers
@@ -74,6 +76,21 @@ class WorkoutStatsQueryTest {
     private void log(User owner, WorkoutCategory category, LocalDate date, Integer minutes, Integer intensity) {
         em.persist(WorkoutLog.builder()
                 .user(owner).category(category).performedDate(date).durationMin(minutes).intensity(intensity)
+                .build());
+    }
+
+    private void log(User owner, WorkoutCategory category, LocalDate date, Integer minutes,
+                     Integer intensity, TrainingPlan plan) {
+        em.persist(WorkoutLog.builder()
+                .user(owner).category(category).performedDate(date).durationMin(minutes)
+                .intensity(intensity).plan(plan)
+                .build());
+    }
+
+    private TrainingPlan plan(LocalDate date) {
+        return em.persist(TrainingPlan.builder()
+                .user(user).category(dance).title("trening")
+                .plannedDate(date).status(PlanStatus.PLANNED)
                 .build());
     }
 
@@ -180,7 +197,7 @@ class WorkoutStatsQueryTest {
         log(otherUser, dance, LocalDate.of(2026, 3, 5), 120, 10);
         em.flush();
 
-        IntensityStatsView row = workoutLogRepository.aggregateIntensity(user.getId(), FROM, TO);
+        PeriodStatsView row = workoutLogRepository.aggregatePeriod(user.getId(), FROM, TO);
 
         assertEquals(3L, row.getTotalCount());
         assertEquals(2L, row.getRatedCount());
@@ -192,11 +209,28 @@ class WorkoutStatsQueryTest {
     void shouldReturnZeroRowForEmptyPeriod() {
         em.flush();
 
-        IntensityStatsView row = workoutLogRepository.aggregateIntensity(user.getId(), FROM, TO);
+        PeriodStatsView row = workoutLogRepository.aggregatePeriod(user.getId(), FROM, TO);
 
         assertEquals(0L, row.getTotalCount());
         assertEquals(0L, row.getRatedCount());
         assertEquals(0L, row.getIntensitySum());
+        assertEquals(0L, row.getPlannedCount());
+    }
+
+    @Test
+    @DisplayName("licznik planowanych pomija wpisy bez planu i nie gubi żadnego treningu")
+    void shouldCountPlannedWithoutLosingAdHoc() {
+        log(user, dance, LocalDate.of(2026, 3, 5), 90, 8, plan(LocalDate.of(2026, 3, 5)));
+        log(user, gym, LocalDate.of(2026, 3, 6), 30, null, null);
+        log(user, dance, LocalDate.of(2026, 3, 7), 60, 7, null);
+        log(otherUser, dance, LocalDate.of(2026, 3, 5), 120, 10, null);
+        em.flush();
+
+        PeriodStatsView row = workoutLogRepository.aggregatePeriod(user.getId(), FROM, TO);
+
+        // Gdyby zapytanie joinowało po l.plan zamiast czytać l.plan.id, totalCount spadłby tu do 1.
+        assertEquals(3L, row.getTotalCount());
+        assertEquals(1L, row.getPlannedCount());
     }
 
 }
