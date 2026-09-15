@@ -3,12 +3,8 @@ package pl.tomaszosuch.trainingplatform_backend.mapper;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
-import pl.tomaszosuch.trainingplatform_backend.dto.response.CategoryStatisticsResponse;
-import pl.tomaszosuch.trainingplatform_backend.dto.response.PlanCompletionResponse;
-import pl.tomaszosuch.trainingplatform_backend.dto.response.StatisticsResponse;
-import pl.tomaszosuch.trainingplatform_backend.service.model.CategoryStatistics;
-import pl.tomaszosuch.trainingplatform_backend.service.model.PlanCompletion;
-import pl.tomaszosuch.trainingplatform_backend.service.model.WorkoutStatistics;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.*;
+import pl.tomaszosuch.trainingplatform_backend.service.model.*;
 
 import java.time.LocalDate;
 
@@ -29,4 +25,13 @@ public interface StatisticsMapper {
     @Mapping(target = "completionBase", expression = "java(completion.completionBase())")
     @Mapping(target = "completionRate", expression = "java(completion.completionRate())")
     PlanCompletionResponse toPlanCompletionResponse(PlanCompletion completion);
+
+    @Mapping(target = "workoutCount", source = "statistics.totalSessions")
+    @Mapping(target = "totalMinutes", source = "statistics.totalMinutes")
+    @Mapping(target = "weeks", source = "statistics.weeks")
+    WeeklyStatisticsResponse toWeeklyResponse(LocalDate from, LocalDate to, WeeklyStatistics statistics);
+
+    @Mapping(target = "workoutCount", source = "sessions")
+    @Mapping(target = "totalMinutes", source = "minutes")
+    WeeklyPointResponse toWeeklyPoint(WeeklyPoint point);
 }

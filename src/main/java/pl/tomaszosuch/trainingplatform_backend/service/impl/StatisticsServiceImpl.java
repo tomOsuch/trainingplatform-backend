@@ -4,20 +4,20 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.StatisticsResponse;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.WeeklyStatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
 import pl.tomaszosuch.trainingplatform_backend.mapper.StatisticsMapper;
+import pl.tomaszosuch.trainingplatform_backend.repository.DailyStatsView;
 import pl.tomaszosuch.trainingplatform_backend.repository.PlanStatusCountView;
 import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutLogRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.StatisticsService;
-import pl.tomaszosuch.trainingplatform_backend.service.model.CategoryStatistics;
-import pl.tomaszosuch.trainingplatform_backend.service.model.PlanCompletion;
-import pl.tomaszosuch.trainingplatform_backend.service.model.WorkoutStatistics;
+import pl.tomaszosuch.trainingplatform_backend.service.model.*;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.time.temporal.TemporalAdjusters;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,6 +27,7 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     private static final String RANGE_REQUIRED_MESSAGE = "Zakres dat jest wymagany";
     private static final String RANGE_ORDER_MESSAGE = "Data początkowa nie może być późniejsza niż końcowa";
+    private static final long[] EMPTY_WEEK = new long[2];
     private static final Comparator<CategoryStatistics> MOST_SIGNIFICANT_FIRST =
             Comparator.<CategoryStatistics>comparingLong(CategoryStatistics::minutes).reversed()
                     .thenComparing(Comparator.<CategoryStatistics>comparingLong(CategoryStatistics::sessions).reversed())
@@ -74,6 +75,41 @@ public class StatisticsServiceImpl implements StatisticsService {
     public StatisticsResponse statistics(Long userId, LocalDate from, LocalDate to) {
         validateRange(from, to);
         return statisticsMapper.toResponse(from, to, workoutStatistics(userId, from, to), planCompletion(userId, from, to));
+    }
+
+    @Override
+    public WeeklyStatisticsResponse weeklyStatistics(Long userId, LocalDate from, LocalDate to) {
+        validateRange(from, to);
+
+        Map<LocalDate, long[]> byWeek = new HashMap<>();
+        for (DailyStatsView row : workoutLogRepository.aggregateByDay(userId, from, to)) {
+            long[] bucket = byWeek.computeIfAbsent(mondayOf(row.getDay()), key -> new long[2]);
+            bucket[0] += row.getSessions();
+            bucket[1] += row.getMinutes();
+        }
+
+        List<WeeklyPoint> weeks = new ArrayList<>();
+        LocalDate lastWeekStart = mondayOf(to);
+        for (LocalDate weekStart = mondayOf(from); !weekStart.isAfter(lastWeekStart); weekStart = weekStart.plusWeeks(1)) {
+            LocalDate weekEnd = weekStart.plusDays(6);
+            long[] bucket = byWeek.getOrDefault(weekStart, EMPTY_WEEK);
+            weeks.add(new WeeklyPoint(
+                    weekStart,
+                    weekEnd,
+                    weekStart.isBefore(from) || weekEnd.isAfter(to),
+                    bucket[0],
+                    bucket[1]));
+        }
+
+        long totalSessions = weeks.stream().mapToLong(WeeklyPoint::sessions).sum();
+        long totalMinutes = weeks.stream().mapToLong(WeeklyPoint::minutes).sum();
+
+        return statisticsMapper.toWeeklyResponse(from, to,
+                new WeeklyStatistics(totalSessions, totalMinutes, weeks));
+    }
+
+    private static LocalDate mondayOf(LocalDate date) {
+        return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
     }
 
     private static void validateRange(LocalDate from, LocalDate to) {

@@ -1,5 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.service;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -14,19 +15,18 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
 import pl.tomaszosuch.trainingplatform_backend.mapper.StatisticsMapper;
-import pl.tomaszosuch.trainingplatform_backend.repository.CategoryStatsView;
-import pl.tomaszosuch.trainingplatform_backend.repository.PlanStatusCountView;
-import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
-import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutLogRepository;
+import pl.tomaszosuch.trainingplatform_backend.repository.*;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.StatisticsServiceImpl;
 import pl.tomaszosuch.trainingplatform_backend.service.model.CategoryStatistics;
 import pl.tomaszosuch.trainingplatform_backend.service.model.PlanCompletion;
+import pl.tomaszosuch.trainingplatform_backend.service.model.WeeklyStatistics;
 import pl.tomaszosuch.trainingplatform_backend.service.model.WorkoutStatistics;
 
 @ExtendWith(MockitoExtension.class)
@@ -93,6 +93,29 @@ class StatisticsServiceImplTest {
                 .thenReturn(counts.entrySet().stream()
                         .map(e -> statusRow(e.getKey(), e.getValue()))
                         .toList());
+    }
+
+    private static DailyStatsView day(LocalDate date, long sessions, long minutes) {
+        return new DailyStatsView() {
+            public LocalDate getDay() {
+                return date;
+            }
+
+            public Long getSessions() {
+                return sessions;
+            }
+
+            public Long getMinutes() {
+                return minutes;
+            }
+        };
+    }
+
+    private WeeklyStatistics capturedWeekly(LocalDate from, LocalDate to) {
+        service.weeklyStatistics(7L, from, to);
+        ArgumentCaptor<WeeklyStatistics> captor = ArgumentCaptor.forClass(WeeklyStatistics.class);
+        verify(statisticsMapper).toWeeklyResponse(eq(from), eq(to), captor.capture());
+        return captor.getValue();
     }
 
     @Test
@@ -274,6 +297,55 @@ class StatisticsServiceImplTest {
         verify(workoutLogRepository, never()).aggregateByCategory(anyLong(), any(), any());
         verify(trainingPlanRepository, never()).countByStatus(anyLong(), any(), any(), any());
         verifyNoInteractions(statisticsMapper);
+    }
+
+    @Test
+    @DisplayName("tydzień bez treningów wraca z zerem, nie znika z odpowiedzi")
+    void shouldIncludeEmptyWeeks() {
+        when(workoutLogRepository.aggregateByDay(7L, LocalDate.of(2026, 3, 2), LocalDate.of(2026, 3, 22)))
+                .thenReturn(List.of(day(LocalDate.of(2026, 3, 3), 2, 90),
+                        day(LocalDate.of(2026, 3, 17), 1, 45)));
+
+        WeeklyStatistics weekly = capturedWeekly(LocalDate.of(2026, 3, 2), LocalDate.of(2026, 3, 22));
+
+        assertEquals(3, weekly.weeks().size());
+        assertEquals(0L, weekly.weeks().get(1).sessions());
+        assertEquals(0L, weekly.weeks().get(1).minutes());
+        assertEquals(LocalDate.of(2026, 3, 9), weekly.weeks().get(1).weekStart());
+    }
+
+    @Test
+    @DisplayName("niedziela należy do tygodnia zaczynającego się w poprzedni poniedziałek")
+    void shouldBucketSundayIntoPreviousMonday() {
+        when(workoutLogRepository.aggregateByDay(any(), any(), any()))
+                .thenReturn(List.of(day(LocalDate.of(2026, 3, 8), 1, 60)));
+
+        WeeklyStatistics weekly = capturedWeekly(LocalDate.of(2026, 3, 2), LocalDate.of(2026, 3, 8));
+
+        assertEquals(1, weekly.weeks().size());
+        assertEquals(LocalDate.of(2026, 3, 2), weekly.weeks().get(0).weekStart());
+        assertEquals(1L, weekly.weeks().get(0).sessions());
+    }
+
+    @Test
+    @DisplayName("skrajne tygodnie zakresu są oznaczone jako niepełne")
+    void shouldMarkPartialWeeks() {
+        when(workoutLogRepository.aggregateByDay(any(), any(), any())).thenReturn(List.of());
+
+        WeeklyStatistics weekly = capturedWeekly(LocalDate.of(2026, 3, 4), LocalDate.of(2026, 3, 18));
+
+        assertTrue(weekly.weeks().get(0).partial());
+        assertFalse(weekly.weeks().get(1).partial());
+        assertTrue(weekly.weeks().get(2).partial());
+    }
+
+    @Test
+    @DisplayName("odwrócony zakres odrzucony bez pytania bazy")
+    void shouldRejectInvertedRangeInWeekly() {
+        assertThrows(IllegalArgumentException.class, () -> service.weeklyStatistics(
+                7L, LocalDate.of(2026, 3, 20), LocalDate.of(2026, 3, 1)));
+
+        verify(workoutLogRepository, never()).aggregateByDay(any(), any(), any());
     }
 
 }

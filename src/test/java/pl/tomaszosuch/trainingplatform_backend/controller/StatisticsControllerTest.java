@@ -1,6 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.controller;
 
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,7 +12,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Optional;
 
+import com.jayway.jsonpath.DocumentContext;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,13 +33,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
-import pl.tomaszosuch.trainingplatform_backend.dto.response.CategoryStatisticsResponse;
-import pl.tomaszosuch.trainingplatform_backend.dto.response.PlanCompletionResponse;
-import pl.tomaszosuch.trainingplatform_backend.dto.response.StatisticsResponse;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.*;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
 import pl.tomaszosuch.trainingplatform_backend.service.StatisticsService;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @WebMvcTest(controllers = StatisticsController.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = JwtAuthenticationFilter.class))
@@ -134,8 +137,8 @@ class StatisticsControllerTest {
         mockMvc.perform(get("/statistics").param("to", "2026-03-31").with(user(currentUser)))
                 .andExpect(status().isBadRequest());
 
-        verify(statisticsService, never()).statistics(eq(1L), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any());
+        verify(statisticsService, never()).statistics(eq(1L), any(),
+                any());
     }
 
     @Test
@@ -165,6 +168,41 @@ class StatisticsControllerTest {
                 .andExpect(jsonPath("$.totalMinutes").value(0))
                 .andExpect(jsonPath("$.byCategory").isEmpty())
                 .andExpect(jsonPath("$.planCompletion.completionRate").doesNotExist());
+    }
+
+
+    @Test
+    @DisplayName("GET /statistics/weekly: suma tygodni zgadza się z podsumowaniem okresu")
+    void shouldKeepWeeklySumConsistentWithTotals() throws Exception {
+        WeeklyStatisticsResponse weekly = new WeeklyStatisticsResponse(
+                FROM, TO, 7, 390,
+                List.of(new WeeklyPointResponse(LocalDate.of(2026, 3, 2), LocalDate.of(2026, 3, 8), true, 4, 240),
+                        new WeeklyPointResponse(LocalDate.of(2026, 3, 9), LocalDate.of(2026, 3, 15), false, 0, 0),
+                        new WeeklyPointResponse(LocalDate.of(2026, 3, 16), LocalDate.of(2026, 3, 22), false, 3, 150)));
+        when(statisticsService.weeklyStatistics(1L, FROM, TO)).thenReturn(weekly);
+
+        String body = mockMvc.perform(get("/statistics/weekly")
+                        .param("from", "2026-03-01").param("to", "2026-03-31")
+                        .with(user(currentUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weeks.length()").value(3))
+                .andExpect(jsonPath("$.weeks[1].workoutCount").value(0))
+                .andExpect(jsonPath("$.weeks[0].partial").value(true))
+                .andReturn().getResponse().getContentAsString();
+
+        DocumentContext json = JsonPath.parse(body);
+        int sumFromWeeks = json.<List<Integer>>read("$.weeks[*].workoutCount").stream().mapToInt(Integer::intValue).sum();
+        int totalFromResponse = json.read("$.workoutCount");
+        assertEquals(totalFromResponse, sumFromWeeks);
+    }
+
+    @Test
+    @DisplayName("GET /statistics/weekly bez granicy zakresu zwraca 400")
+    void shouldReturn400WhenWeeklyRangeIncomplete() throws Exception {
+        mockMvc.perform(get("/statistics/weekly").param("from", "2026-03-01").with(user(currentUser)))
+                .andExpect(status().isBadRequest());
+
+        verify(statisticsService, never()).weeklyStatistics(anyLong(), any(), any());
     }
 
 }

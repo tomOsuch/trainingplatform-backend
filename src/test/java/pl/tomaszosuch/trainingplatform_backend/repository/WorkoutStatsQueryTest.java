@@ -152,4 +152,22 @@ class WorkoutStatsQueryTest {
         assertTrue(workoutLogRepository.aggregateByCategory(user.getId(), FROM, TO).isEmpty());
     }
 
+
+    @Test
+    @DisplayName("agregat dzienny grupuje po dacie i pomija cudze wpisy")
+    void shouldAggregateByDay() {
+        log(user, dance, LocalDate.of(2026, 3, 5), 90);
+        log(user, gym, LocalDate.of(2026, 3, 5), 30);
+        log(user, dance, LocalDate.of(2026, 3, 7), 60);
+        log(otherUser, dance, LocalDate.of(2026, 3, 5), 120);
+
+        List<DailyStatsView> rows = workoutLogRepository.aggregateByDay(user.getId(), FROM, TO);
+
+        assertEquals(2, rows.size());
+        assertEquals(LocalDate.of(2026, 3, 5), rows.get(0).getDay());
+        assertEquals(2L, rows.get(0).getSessions());
+        assertEquals(120L, rows.get(0).getMinutes());
+        assertEquals(1L, rows.get(1).getSessions());
+    }
+
 }
