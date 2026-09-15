@@ -26,10 +26,6 @@ import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutLog;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 
-/**
- * Sprawdza samo zapytanie agregujące na prawdziwym PostgreSQL — granice zakresu, izolację
- * użytkowników i wpisy bez czasu trwania. Mockami tego nie da się przetestować.
- */
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -75,6 +71,12 @@ class WorkoutStatsQueryTest {
                 .build());
     }
 
+    private void log(User owner, WorkoutCategory category, LocalDate date, Integer minutes, Integer intensity) {
+        em.persist(WorkoutLog.builder()
+                .user(owner).category(category).performedDate(date).durationMin(minutes).intensity(intensity)
+                .build());
+    }
+
     private Map<Long, CategoryStatsView> statsFor(User owner) {
         em.flush();
         return workoutLogRepository.aggregateByCategory(owner.getId(), FROM, TO).stream()
@@ -107,8 +109,6 @@ class WorkoutStatsQueryTest {
         assertEquals(150L, rows.get(dance.getId()).getMinutes());
         assertEquals(2L, rows.get(dance.getId()).getSessions());
         assertEquals("#9B59B6", rows.get(dance.getId()).getCategoryColor());
-        // Ikona idzie tą samą drogą co kolor: SELECT plus GROUP BY. Brak kolumny
-        // w GROUP BY nie wysadziłby startu aplikacji, tylko to zapytanie.
         assertEquals("music", rows.get(dance.getId()).getCategoryIconName());
         assertEquals("dumbbell", rows.get(gym.getId()).getCategoryIconName());
         assertEquals(45L, rows.get(gym.getId()).getMinutes());
@@ -168,6 +168,35 @@ class WorkoutStatsQueryTest {
         assertEquals(2L, rows.get(0).getSessions());
         assertEquals(120L, rows.get(0).getMinutes());
         assertEquals(1L, rows.get(1).getSessions());
+    }
+
+
+    @Test
+    @DisplayName("licznik ocenionych pomija wpisy bez oceny, licznik ogółem ich nie gubi")
+    void shouldCountRatedSeparatelyFromTotal() {
+        log(user, dance, LocalDate.of(2026, 3, 5), 90, 8);
+        log(user, gym, LocalDate.of(2026, 3, 6), 30, 9);
+        log(user, dance, LocalDate.of(2026, 3, 7), 60, null);
+        log(otherUser, dance, LocalDate.of(2026, 3, 5), 120, 10);
+        em.flush();
+
+        IntensityStatsView row = workoutLogRepository.aggregateIntensity(user.getId(), FROM, TO);
+
+        assertEquals(3L, row.getTotalCount());
+        assertEquals(2L, row.getRatedCount());
+        assertEquals(17L, row.getIntensitySum());
+    }
+
+    @Test
+    @DisplayName("okres bez wpisów zwraca wiersz z zerami, nie null")
+    void shouldReturnZeroRowForEmptyPeriod() {
+        em.flush();
+
+        IntensityStatsView row = workoutLogRepository.aggregateIntensity(user.getId(), FROM, TO);
+
+        assertEquals(0L, row.getTotalCount());
+        assertEquals(0L, row.getRatedCount());
+        assertEquals(0L, row.getIntensitySum());
     }
 
 }

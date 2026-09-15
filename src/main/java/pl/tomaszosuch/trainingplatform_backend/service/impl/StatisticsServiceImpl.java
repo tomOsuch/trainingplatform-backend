@@ -7,10 +7,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.response.StatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.WeeklyStatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
 import pl.tomaszosuch.trainingplatform_backend.mapper.StatisticsMapper;
-import pl.tomaszosuch.trainingplatform_backend.repository.DailyStatsView;
-import pl.tomaszosuch.trainingplatform_backend.repository.PlanStatusCountView;
-import pl.tomaszosuch.trainingplatform_backend.repository.TrainingPlanRepository;
-import pl.tomaszosuch.trainingplatform_backend.repository.WorkoutLogRepository;
+import pl.tomaszosuch.trainingplatform_backend.repository.*;
 import pl.tomaszosuch.trainingplatform_backend.service.StatisticsService;
 import pl.tomaszosuch.trainingplatform_backend.service.model.*;
 
@@ -72,9 +69,19 @@ public class StatisticsServiceImpl implements StatisticsService {
     }
 
     @Override
+    public IntensitySummary intensitySummary(Long userId, LocalDate from, LocalDate to) {
+        validateRange(from, to);
+        IntensityStatsView row = workoutLogRepository.aggregateIntensity(userId, from, to);
+        return new IntensitySummary(row.getTotalCount(), row.getRatedCount(), row.getIntensitySum());
+    }
+
+    @Override
     public StatisticsResponse statistics(Long userId, LocalDate from, LocalDate to) {
         validateRange(from, to);
-        return statisticsMapper.toResponse(from, to, workoutStatistics(userId, from, to), planCompletion(userId, from, to));
+        return statisticsMapper.toResponse(from, to,
+                workoutStatistics(userId, from, to),
+                planCompletion(userId, from, to),
+                intensitySummary(userId, from, to));
     }
 
     @Override

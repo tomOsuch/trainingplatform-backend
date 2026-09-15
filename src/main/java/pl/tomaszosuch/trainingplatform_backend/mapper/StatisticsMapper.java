@@ -15,12 +15,17 @@ public interface StatisticsMapper {
     @Mapping(target = "totalMinutes", source = "statistics.totalMinutes")
     @Mapping(target = "byCategory", source = "statistics.byCategory")
     @Mapping(target = "planCompletion", source = "completion")
+    @Mapping(target = "intensity", source = "intensity")
     StatisticsResponse toResponse(LocalDate from, LocalDate to,
-                                  WorkoutStatistics statistics, PlanCompletion completion);
+                                  WorkoutStatistics statistics, PlanCompletion completion,
+                                  IntensitySummary intensity);
 
     @Mapping(target = "workoutCount", source = "sessions")
     @Mapping(target = "totalMinutes", source = "minutes")
     CategoryStatisticsResponse toCategoryResponse(CategoryStatistics category);
+
+    @Mapping(target = "average", expression = "java(intensity.average())")
+    IntensitySummaryResponse toIntensityResponse(IntensitySummary intensity);
 
     @Mapping(target = "completionBase", expression = "java(completion.completionBase())")
     @Mapping(target = "completionRate", expression = "java(completion.completionRate())")

@@ -9,6 +9,7 @@ public record StatisticsResponse(
         long workoutCount,
         long totalMinutes,
         List<CategoryStatisticsResponse> byCategory,
-        PlanCompletionResponse planCompletion
+        PlanCompletionResponse planCompletion,
+        IntensitySummaryResponse intensity
 ) {
 }

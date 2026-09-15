@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -80,7 +81,8 @@ class StatisticsControllerTest {
         return new StatisticsResponse(from, to, 7, 390,
                 List.of(new CategoryStatisticsResponse(5L, "Taniec", "#9B59B6", "music", 4, 240),
                         new CategoryStatisticsResponse(6L, "Siłownia", "#E67E22", "dumbbell", 3, 150)),
-                new PlanCompletionResponse(6, 2, 3, 4, 12, 50));
+                new PlanCompletionResponse(6, 2, 3, 4, 12, 50),
+                new IntensitySummaryResponse(new BigDecimal("8.5"), 4, 7));
     }
 
     @Test
@@ -158,7 +160,8 @@ class StatisticsControllerTest {
     @DisplayName("pusty okres: zera, pusta lista kategorii i procent null")
     void shouldReturnZerosForEmptyPeriod() throws Exception {
         when(statisticsService.statistics(1L, FROM, TO)).thenReturn(new StatisticsResponse(
-                FROM, TO, 0, 0, List.of(), new PlanCompletionResponse(0, 0, 0, 0, 0, null)));
+                FROM, TO, 0, 0, List.of(), new PlanCompletionResponse(0, 0, 0, 0, 0, null),
+                new IntensitySummaryResponse(null, 0, 0)));
 
         mockMvc.perform(get("/statistics")
                         .param("from", "2026-03-01").param("to", "2026-03-31")
@@ -167,6 +170,8 @@ class StatisticsControllerTest {
                 .andExpect(jsonPath("$.workoutCount").value(0))
                 .andExpect(jsonPath("$.totalMinutes").value(0))
                 .andExpect(jsonPath("$.byCategory").isEmpty())
+                .andExpect(jsonPath("$.intensity.average").doesNotExist())
+                .andExpect(jsonPath("$.intensity.ratedCount").value(0))
                 .andExpect(jsonPath("$.planCompletion.completionRate").doesNotExist());
     }
 
@@ -204,5 +209,21 @@ class StatisticsControllerTest {
 
         verify(statisticsService, never()).weeklyStatistics(anyLong(), any(), any());
     }
+
+    @Test
+    @DisplayName("GET /statistics: średnia intensywności przychodzi razem z mianownikiem")
+    void shouldExposeIntensityWithCoverage() throws Exception {
+        when(statisticsService.statistics(1L, FROM, TO)).thenReturn(response(FROM, TO));
+
+        mockMvc.perform(get("/statistics")
+                        .param("from", "2026-03-01").param("to", "2026-03-31")
+                        .with(user(currentUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.intensity.average").value(8.5))
+                .andExpect(jsonPath("$.intensity.ratedCount").value(4))
+                .andExpect(jsonPath("$.workoutCount").value(7))
+                .andExpect(jsonPath("$.intensity.totalCount").value(7));
+    }
+
 
 }
