@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,6 +23,7 @@ import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.LastAdminGuard;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.ProfileServiceImpl;
 
 import static org.junit.Assert.assertFalse;
@@ -42,7 +42,6 @@ import java.util.Optional;
 @DisplayName("ProfileServiceImplTest")
 public class ProfileServiceImplTest {
 
-    @InjectMocks
     private ProfileServiceImpl profileService;
 
     @Mock
@@ -64,6 +63,9 @@ public class ProfileServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        profileService = new ProfileServiceImpl(userRepository, passwordEncoder, userMapper,
+                invitationRepository, refreshTokenService, new LastAdminGuard(userRepository));
+
         existingUser = User.builder()
                 .id(1L)
                 .email("jan@example.com")
@@ -308,7 +310,6 @@ public class ProfileServiceImplTest {
 
             verify(userRepository, never()).delete(any(User.class));
             verify(invitationRepository, never()).revokePendingByInviter(anyLong(), any());
-            verify(userRepository, never()).countByRole(any(Role.class));
         }
 
         @Test

@@ -103,8 +103,6 @@ class AdminControllerTest {
                 .content(body);
     }
 
-    // --- GET /admin/users (G1) ---
-
     @Test
     @DisplayName("zwraca wyłącznie dane konta — dokładnie siedem pól")
     void shouldReturnAccountDataOnly() throws Exception {
@@ -237,9 +235,9 @@ class AdminControllerTest {
     @Test
     @DisplayName("wyłączenie ostatniego administratora: 403 z komunikatem o ostatnim koncie")
     void shouldReturn403ForLastActiveAdmin() throws Exception {
-        String message = "To ostatnie aktywne konto administratora — po jego wyłączeniu nikt nie odzyska dostępu do panelu";
+        String message = "To ostatnie aktywne konto administratora — bez niego nikt nie odzyska dostępu do panelu";
         when(adminUserService.changeStatus(1L, 3L, AccountStatus.INACTIVE))
-                .thenThrow(new LastAdminException(message));
+                .thenThrow(new LastAdminException());
 
         mockMvc.perform(patchStatus(3L, "{\"status\":\"INACTIVE\"}").with(user(admin)))
                 .andExpect(status().isForbidden())

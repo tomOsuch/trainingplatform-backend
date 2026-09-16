@@ -12,10 +12,10 @@ import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +30,7 @@ import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapperImpl;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.LastAdminGuard;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AdminUserServiceImpl;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,8 +48,13 @@ class AdminUserServiceImplTest {
     @Spy
     private UserMapper userMapper = new UserMapperImpl();
 
-    @InjectMocks
     private AdminUserServiceImpl adminUserService;
+
+    @BeforeEach
+    void setUp() {
+        adminUserService = new AdminUserServiceImpl(userRepository, userMapper, refreshTokenService,
+                new LastAdminGuard(userRepository));
+    }
 
     private static User account(Long id, Role role, boolean active) {
         return User.builder()
@@ -112,7 +118,7 @@ class AdminUserServiceImplTest {
         LastAdminException ex = assertThrows(LastAdminException.class,
                 () -> adminUserService.changeStatus(ADMIN_ID, 3L, AccountStatus.INACTIVE));
 
-        assertEquals("To ostatnie aktywne konto administratora — po jego wyłączeniu nikt nie odzyska dostępu do panelu",
+        assertEquals("To ostatnie aktywne konto administratora — bez niego nikt nie odzyska dostępu do panelu",
                 ex.getMessage());
         verify(userRepository, never()).save(any(User.class));
         verify(refreshTokenService, never()).revokeAllForUser(anyLong());
