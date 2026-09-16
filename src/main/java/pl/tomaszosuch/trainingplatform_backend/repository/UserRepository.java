@@ -32,9 +32,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
                             @Param("activeStates") Collection<Boolean> activeStates,
                             Pageable pageable);
 
-    @Query("SELECT COUNT(u) FROM User u WHERE u.role = :role AND u.isActive = true")
-    long countActiveByRole(@Param("role") Role role);
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.role = :role AND u.isActive = true")
     List<User> lockActiveByRole(@Param("role") Role role);
