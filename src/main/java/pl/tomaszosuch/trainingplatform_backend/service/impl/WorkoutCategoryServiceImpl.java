@@ -44,17 +44,6 @@ public class WorkoutCategoryServiceImpl implements WorkoutCategoryService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public WorkoutCategoryResponse getCategoryByName(String name) {
-
-        return workoutCategoryRepository.findAll().stream()
-                .filter(category -> category.getName().equalsIgnoreCase(name))
-                .findFirst()
-                .map(workoutCategoryMapper::toResponse)
-                .orElseThrow(() -> new WorkoutCategoryNotFoundException(name));
-    }
-
-    @Override
     public WorkoutCategoryResponse createCategory(WorkoutCategoryRequest request) {
 
         if (workoutCategoryRepository.existsByName(request.name())) {

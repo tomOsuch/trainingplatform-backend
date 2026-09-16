@@ -19,8 +19,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByRole(Role role);
 
-    long countByRole(Role role);
-
     @Query("""
             SELECT u FROM User u
             WHERE (lower(u.lastName) LIKE :pattern ESCAPE '!'
