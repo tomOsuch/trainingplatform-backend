@@ -1,12 +1,15 @@
 package pl.tomaszosuch.trainingplatform_backend.repository;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
@@ -31,5 +34,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT COUNT(u) FROM User u WHERE u.role = :role AND u.isActive = true")
     long countActiveByRole(@Param("role") Role role);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.role = :role AND u.isActive = true")
+    List<User> lockActiveByRole(@Param("role") Role role);
 
 }

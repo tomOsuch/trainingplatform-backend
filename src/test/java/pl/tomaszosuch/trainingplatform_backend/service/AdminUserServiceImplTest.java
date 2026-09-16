@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -80,7 +81,7 @@ class AdminUserServiceImplTest {
         assertFalse(target.getIsActive());
         verify(userRepository).save(target);
         verify(refreshTokenService).revokeAllForUser(5L);
-        verify(userRepository, never()).countActiveByRole(any());
+        verify(userRepository, never()).lockActiveByRole(any());
     }
 
     @Test
@@ -113,7 +114,7 @@ class AdminUserServiceImplTest {
     @DisplayName("nie pozwala wyłączyć ostatniego aktywnego administratora — z własnym komunikatem")
     void shouldRejectLastActiveAdmin() {
         stubFound(account(3L, Role.ADMIN, true));
-        when(userRepository.countActiveByRole(Role.ADMIN)).thenReturn(1L);
+        when(userRepository.lockActiveByRole(Role.ADMIN)).thenReturn(List.of(account(3L, Role.ADMIN, true)));
 
         LastAdminException ex = assertThrows(LastAdminException.class,
                 () -> adminUserService.changeStatus(ADMIN_ID, 3L, AccountStatus.INACTIVE));
@@ -129,7 +130,8 @@ class AdminUserServiceImplTest {
     void shouldDeactivateAdminWhenAnotherActiveRemains() {
         User target = account(3L, Role.ADMIN, true);
         stubFound(target);
-        when(userRepository.countActiveByRole(Role.ADMIN)).thenReturn(2L);
+        when(userRepository.lockActiveByRole(Role.ADMIN))
+                .thenReturn(List.of(account(3L, Role.ADMIN, true), account(4L, Role.ADMIN, true)));
 
         adminUserService.changeStatus(ADMIN_ID, 3L, AccountStatus.INACTIVE);
 
@@ -144,7 +146,7 @@ class AdminUserServiceImplTest {
 
         adminUserService.changeStatus(ADMIN_ID, 3L, AccountStatus.INACTIVE);
 
-        verify(userRepository, never()).countActiveByRole(any());
+        verify(userRepository, never()).lockActiveByRole(any());
     }
 
     @Test

@@ -137,6 +137,6 @@ class AdminUserQueryTest {
         em.persist(inactive);
         em.flush();
 
-        assertEquals(1, userRepository.countActiveByRole(Role.ADMIN));
+        assertEquals(1, userRepository.lockActiveByRole(Role.ADMIN).size());
     }
 }

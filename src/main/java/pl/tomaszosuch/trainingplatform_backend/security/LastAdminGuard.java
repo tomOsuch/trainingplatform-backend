@@ -18,7 +18,7 @@ public class LastAdminGuard {
         if (user.getRole() != Role.ADMIN || !Boolean.TRUE.equals(user.getIsActive())) {
             return;
         }
-        if (userRepository.countActiveByRole(Role.ADMIN) <= 1) {
+        if (userRepository.lockActiveByRole(Role.ADMIN).size() <= 1) {
             throw new LastAdminException();
         }
     }

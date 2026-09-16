@@ -36,6 +36,7 @@ import static org.mockito.Mockito.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
@@ -303,7 +304,7 @@ public class ProfileServiceImplTest {
 
             when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
             when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
-            when(userRepository.countActiveByRole(Role.ADMIN)).thenReturn(1L);
+            when(userRepository.lockActiveByRole(Role.ADMIN)).thenReturn(List.of(accountOwner));
 
             assertThrows(LastAdminException.class,
                     () -> profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD)));
@@ -319,7 +320,8 @@ public class ProfileServiceImplTest {
 
             when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
             when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
-            when(userRepository.countActiveByRole(Role.ADMIN)).thenReturn(2L);
+            when(userRepository.lockActiveByRole(Role.ADMIN))
+                    .thenReturn(List.of(accountOwner, User.builder().id(9L).role(Role.ADMIN).isActive(true).build()));
 
             profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD));
 
@@ -334,7 +336,7 @@ public class ProfileServiceImplTest {
 
             profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD));
 
-            verify(userRepository, never()).countActiveByRole(any(Role.class));
+            verify(userRepository, never()).lockActiveByRole(any(Role.class));
         }
 
         @Test
@@ -348,7 +350,7 @@ public class ProfileServiceImplTest {
             assertThrows(IllegalArgumentException.class,
                     () -> profileService.deleteAccount(3L, new DeleteAccountRequest("ZleHaslo")));
 
-            verify(userRepository, never()).countActiveByRole(any(Role.class));
+            verify(userRepository, never()).lockActiveByRole(any(Role.class));
         }
 
         @Test
