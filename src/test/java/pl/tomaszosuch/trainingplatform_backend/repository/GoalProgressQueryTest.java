@@ -59,7 +59,7 @@ class GoalProgressQueryTest {
     void setUp() {
         user = em.persist(user("progress@example.com"));
         otherUser = em.persist(user("other@example.com"));
-        dance = em.persist(WorkoutCategory.builder().name("Taniec").build());
+        dance = em.persist(WorkoutCategory.builder().name("Taniec testowy").build());
         gym = em.persist(WorkoutCategory.builder().name("Siłownia").build());
     }
 

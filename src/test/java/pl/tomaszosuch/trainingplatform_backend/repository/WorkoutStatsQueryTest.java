@@ -56,7 +56,7 @@ class WorkoutStatsQueryTest {
     void setUp() {
         user = em.persist(user("stats@example.com"));
         otherUser = em.persist(user("other@example.com"));
-        dance = em.persist(WorkoutCategory.builder().name("Taniec").color("#9B59B6").iconName("music").build());
+        dance = em.persist(WorkoutCategory.builder().name("Taniec testowy").color("#9B59B6").iconName("music").build());
         gym = em.persist(WorkoutCategory.builder().name("Siłownia").color("#E67E22").iconName("dumbbell").build());
     }
 

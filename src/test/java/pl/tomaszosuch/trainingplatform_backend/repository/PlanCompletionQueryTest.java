@@ -26,11 +26,6 @@ import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
 import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 
-/**
- * Sprawdza samo zapytanie agregujące plany na prawdziwym PostgreSQL — przede wszystkim regułę
- * odsiewania planów jeszcze przed użytkownikiem, której mockami nie da się przetestować.
- * „Dziś" jest parametrem, więc test nie zależy od daty uruchomienia.
- */
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -59,7 +54,7 @@ class PlanCompletionQueryTest {
     void setUp() {
         user = em.persist(user("plans@example.com"));
         otherUser = em.persist(user("other@example.com"));
-        dance = em.persist(WorkoutCategory.builder().name("Taniec").color("#9B59B6").build());
+        dance = em.persist(WorkoutCategory.builder().name("Taniec testowy").color("#9B59B6").build());
     }
 
     private static User user(String email) {

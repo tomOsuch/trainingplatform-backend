@@ -93,7 +93,7 @@ Controller  →  Service (interfejs + impl)  →  Repository  →  Baza danych
 
 ```
 pl.tomaszosuch.trainingplatform_backend
-├── config          # Security, OpenAPI, DataInitializer, AdminBootstrap, klasy *Properties
+├── config          # Security, OpenAPI, AdminBootstrap, klasy *Properties
 ├── controller      # Kontrolery REST
 ├── dto
 │   ├── request     # DTO żądań (z walidacją)
@@ -145,7 +145,7 @@ Dostępne po starcie:
 | `http://localhost:8025` | **Mailpit** — skrzynka przechwytująca maile |
 | `http://localhost:5050` | pgAdmin |
 
-> Przy pierwszym uruchomieniu Flyway tworzy schemat, `DataInitializer` dodaje 3 domyślne kategorie (**Taniec**, **Gimnastyka**, **Ogólnorozwojowy**), a `AdminBootstrap` zakłada konto administratora.
+> Przy pierwszym uruchomieniu Flyway tworzy schemat wraz z 3 domyślnymi kategoriami  (**Taniec**, **Gimnastyka**, **Ogólnorozwojowy**), a `AdminBootstrap` zakłada konto administratora.
 
 ---
 
@@ -364,7 +364,7 @@ Dołączona jest kolekcja **Postman** (`trainingplatform.postman_collection.json
 | `PUT` | `/workout-categories/{id}` | Edycja kategorii | ADMIN |
 | `DELETE` | `/workout-categories/{id}` | Usunięcie kategorii | ADMIN |
 
-> `POST /workout-categories` zwraca `201 Created`. Endpoint jest dostępny wyłącznie dla roli ADMIN; kategorie startowe zakłada `DataInitializer` przy pierwszym uruchomieniu.
+> `POST /workout-categories` zwraca `201 Created`. Endpoint jest dostępny wyłącznie dla roli ADMIN; kategorie startowe zakłada migracja V14.
 >
 > `iconName` jest **wymagane** i musi należeć do zamkniętego zestawu nazw ikon `lucide-react`: `dumbbell`, `footprints`, `volleyball`, `trophy`, `bike`, `waves-horizontal`, `heart-pulse`, `activity`, `flame`, `mountain`, `music`, `target`, `timer`, `medal`, `zap`, `person-standing`. Zestaw żyje w enumie `CategoryIcon` i jest pilnowany dwukrotnie: walidacją żądania (`400` z listą dozwolonych nazw) oraz ograniczeniem `CHECK` w bazie. Nazwa spoza listy nie wejdzie żadną drogą, bo literówka dawałaby pustą dziurę w kalendarzu bez żadnego błędu.
 
