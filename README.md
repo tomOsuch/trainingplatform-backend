@@ -284,7 +284,11 @@ src/main/resources/db/migration/
 ├── V7__goals.sql                                  # tabela goal
 ├── V8__notification_preferences.sql               # preferencje przypomnień w users
 ├── V9__training_plan_reminders.sql                # reminder_sent_at + indeks częściowy
-└── V10__workout_category_icon.sql                 # icon_name: NOT NULL, DEFAULT, CHECK z zamkniętą listą
+├── V10__workout_category_icon.sql                 # icon_name: NOT NULL, DEFAULT, CHECK z zamkniętą listą
+├── V11__workout_category_color.sql                # color: #RGB → #RRGGBB, NOT NULL, DEFAULT, CHECK
+├── V12__category_icon_canonical_waves.sql         # waves → waves-horizontal (nazwa eksportowana przez lucide)
+├── V13__workout_templates.sql                     # tabela workout_template
+└── V14__default_workout_categories.sql            # trzy domyślne kategorie (wcześniej DataInitializer)
 ```
 
 ### Jak dodać nową migrację
@@ -292,6 +296,7 @@ src/main/resources/db/migration/
 1. Utwórz plik `V<numer>__krotki_opis.sql`
 2. Numer większy od ostatniego; opis w `snake_case` po podwójnym podkreśleniu
 3. Uruchom aplikację — Flyway wykona migrację i dopisze wpis do `flyway_schema_history`
+4. Dopisz plik do inwentarza powyżej — lista w README jest utrzymywana ręcznie
 
 > **Plików już zastosowanych się nie edytuje** — nawet formatowania. Flyway trzyma sumę kontrolną i przerwie start przy niezgodności. Poprawki wprowadza się kolejną migracją.
 
