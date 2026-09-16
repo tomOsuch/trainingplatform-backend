@@ -372,7 +372,7 @@ public class ProfileControllerTest {
     }
 
     @Test
-    @DisplayName("powinien zwrócić 403 dla ostatniego administratora")
+    @DisplayName("usunięcie ostatniego administratora: ten sam komunikat co przy wyłączeniu w panelu")
     public void shouldReturn403ForLastAdmin() throws Exception {
         doThrow(new LastAdminException())
                 .when(profileService).deleteAccount(eq(1L), any(DeleteAccountRequest.class));
@@ -385,6 +385,6 @@ public class ProfileControllerTest {
                                 new DeleteAccountRequest("MojeHaslo123"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403))
-                .andExpect(jsonPath("$.message").value("Nie można usunąć konta ostatniego administratora"));
+                .andExpect(jsonPath("$.message").value("To ostatnie aktywne konto administratora — bez niego nikt nie odzyska dostępu do panelu"));
     }
 }

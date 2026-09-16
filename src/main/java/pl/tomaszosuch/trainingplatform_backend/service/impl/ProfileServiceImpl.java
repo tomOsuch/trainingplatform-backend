@@ -13,12 +13,11 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.NotificationPreferencesResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
-import pl.tomaszosuch.trainingplatform_backend.enums.Role;
-import pl.tomaszosuch.trainingplatform_backend.exception.LastAdminException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.LastAdminGuard;
 import pl.tomaszosuch.trainingplatform_backend.service.ProfileService;
 import pl.tomaszosuch.trainingplatform_backend.service.RefreshTokenService;
 
@@ -35,6 +34,7 @@ public class ProfileServiceImpl implements ProfileService {
     private final UserMapper userMapper;
     private final InvitationRepository invitationRepository;
     private final RefreshTokenService refreshTokenService;
+    private final LastAdminGuard lastAdminGuard;
 
     @Override
     public UserResponse getProfile(Long id) {
@@ -98,9 +98,7 @@ public class ProfileServiceImpl implements ProfileService {
             throw new IllegalArgumentException("Nieprawidłowe hasło");
         }
 
-        if (user.getRole() == Role.ADMIN && userRepository.countActiveByRole(Role.ADMIN) <= 1) {
-            throw new LastAdminException();
-        }
+        lastAdminGuard.requireNotLastActiveAdmin(user);
 
         int revoked = invitationRepository.revokePendingByInviter(userId, LocalDateTime.now());
 

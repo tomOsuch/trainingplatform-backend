@@ -25,6 +25,7 @@ import pl.tomaszosuch.trainingplatform_backend.enums.AccountStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.AdminUserSort;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapperImpl;
+import pl.tomaszosuch.trainingplatform_backend.security.LastAdminGuard;
 import pl.tomaszosuch.trainingplatform_backend.service.AdminUserService;
 import pl.tomaszosuch.trainingplatform_backend.service.RefreshTokenService;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AdminUserServiceImpl;
@@ -32,7 +33,7 @@ import pl.tomaszosuch.trainingplatform_backend.service.impl.AdminUserServiceImpl
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({AdminUserServiceImpl.class, UserMapperImpl.class})
+@Import({AdminUserServiceImpl.class, UserMapperImpl.class, LastAdminGuard.class})
 @DisplayName("AdminUserQueryTest")
 class AdminUserQueryTest {
 
@@ -136,7 +137,6 @@ class AdminUserQueryTest {
         em.persist(inactive);
         em.flush();
 
-        assertEquals(1, userRepository.countActiveByRole(Role.ADMIN));
-        assertEquals(2, userRepository.countByRole(Role.ADMIN));
+        assertEquals(1, userRepository.lockActiveByRole(Role.ADMIN).size());
     }
 }

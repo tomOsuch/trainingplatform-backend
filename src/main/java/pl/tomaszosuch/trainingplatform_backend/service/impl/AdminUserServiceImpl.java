@@ -15,12 +15,11 @@ import pl.tomaszosuch.trainingplatform_backend.dto.response.PageResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.AccountStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.AdminUserSort;
-import pl.tomaszosuch.trainingplatform_backend.enums.Role;
-import pl.tomaszosuch.trainingplatform_backend.exception.LastAdminException;
 import pl.tomaszosuch.trainingplatform_backend.exception.SelfDeactivationException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.LastAdminGuard;
 import pl.tomaszosuch.trainingplatform_backend.service.AdminUserService;
 import pl.tomaszosuch.trainingplatform_backend.service.RefreshTokenService;
 
@@ -30,12 +29,10 @@ import pl.tomaszosuch.trainingplatform_backend.service.RefreshTokenService;
 @RequiredArgsConstructor
 public class AdminUserServiceImpl implements AdminUserService {
 
-    static final String LAST_ACTIVE_ADMIN_MESSAGE =
-            "To ostatnie aktywne konto administratora — po jego wyłączeniu nikt nie odzyska dostępu do panelu";
-
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final RefreshTokenService refreshTokenService;
+    private final LastAdminGuard lastAdminGuard;
 
     @Override
     @Transactional(readOnly = true)
@@ -63,11 +60,8 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (user.getId().equals(adminId)) {
             throw new SelfDeactivationException();
         }
-        if (user.getRole() == Role.ADMIN
-                && Boolean.TRUE.equals(user.getIsActive())
-                && userRepository.countActiveByRole(Role.ADMIN) <= 1) {
-            throw new LastAdminException(LAST_ACTIVE_ADMIN_MESSAGE);
-        }
+
+        lastAdminGuard.requireNotLastActiveAdmin(user);
 
         user.setIsActive(false);
         userRepository.save(user);

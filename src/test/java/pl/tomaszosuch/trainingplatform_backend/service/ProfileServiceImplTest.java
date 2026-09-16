@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,6 +23,7 @@ import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.LastAdminGuard;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.ProfileServiceImpl;
 
 import static org.junit.Assert.assertFalse;
@@ -36,13 +36,13 @@ import static org.mockito.Mockito.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ProfileServiceImplTest")
 public class ProfileServiceImplTest {
 
-    @InjectMocks
     private ProfileServiceImpl profileService;
 
     @Mock
@@ -64,6 +64,9 @@ public class ProfileServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        profileService = new ProfileServiceImpl(userRepository, passwordEncoder, userMapper,
+                invitationRepository, refreshTokenService, new LastAdminGuard(userRepository));
+
         existingUser = User.builder()
                 .id(1L)
                 .email("jan@example.com")
@@ -301,14 +304,13 @@ public class ProfileServiceImplTest {
 
             when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
             when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
-            when(userRepository.countActiveByRole(Role.ADMIN)).thenReturn(1L);
+            when(userRepository.lockActiveByRole(Role.ADMIN)).thenReturn(List.of(accountOwner));
 
             assertThrows(LastAdminException.class,
                     () -> profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD)));
 
             verify(userRepository, never()).delete(any(User.class));
             verify(invitationRepository, never()).revokePendingByInviter(anyLong(), any());
-            verify(userRepository, never()).countByRole(any(Role.class));
         }
 
         @Test
@@ -318,7 +320,8 @@ public class ProfileServiceImplTest {
 
             when(userRepository.findById(3L)).thenReturn(Optional.of(accountOwner));
             when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
-            when(userRepository.countActiveByRole(Role.ADMIN)).thenReturn(2L);
+            when(userRepository.lockActiveByRole(Role.ADMIN))
+                    .thenReturn(List.of(accountOwner, User.builder().id(9L).role(Role.ADMIN).isActive(true).build()));
 
             profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD));
 
@@ -333,7 +336,7 @@ public class ProfileServiceImplTest {
 
             profileService.deleteAccount(3L, new DeleteAccountRequest(PASSWORD));
 
-            verify(userRepository, never()).countActiveByRole(any(Role.class));
+            verify(userRepository, never()).lockActiveByRole(any(Role.class));
         }
 
         @Test
@@ -347,7 +350,7 @@ public class ProfileServiceImplTest {
             assertThrows(IllegalArgumentException.class,
                     () -> profileService.deleteAccount(3L, new DeleteAccountRequest("ZleHaslo")));
 
-            verify(userRepository, never()).countActiveByRole(any(Role.class));
+            verify(userRepository, never()).lockActiveByRole(any(Role.class));
         }
 
         @Test

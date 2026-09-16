@@ -51,7 +51,7 @@ class WorkoutTemplateRepositoryTest {
     void setUp() {
         owner = em.persist(user("wlasciciel@example.com"));
         dance = em.persist(WorkoutCategory.builder()
-                .name("Taniec").color("#9B59B6").iconName("music").build());
+                .name("Taniec testowy").color("#9B59B6").iconName("music").build());
     }
 
     private static User user(String email) {
@@ -89,8 +89,6 @@ class WorkoutTemplateRepositoryTest {
         em.flush();
         em.clear();
 
-        // Usuwamy wierszem w bazie, nie przez JPA: sprawdzamy kaskadę klucza obcego,
-        // a nie kaskadę Hibernate'a. Konto usuwa serwis profilu jednym DELETE.
         jdbcTemplate.update("DELETE FROM users WHERE id = ?", owner.getId());
 
         assertEquals(0, jdbcTemplate.queryForObject(
@@ -123,8 +121,6 @@ class WorkoutTemplateRepositoryTest {
         template(owner, "Wtorkowy trening", 60);
         em.flush();
 
-        // Ostatnia linia obrony. Właściwy komunikat dla użytkownika daje serwis w H2 —
-        // ten test pokazuje, co się stanie, jeśli ktoś zapomni tam dołożyć warunek.
         assertTrue(workoutTemplateRepository.existsByCategoryId(dance.getId()));
         assertThrows(DataIntegrityViolationException.class,
                 () -> jdbcTemplate.update("DELETE FROM workout_category WHERE id = ?", dance.getId()));

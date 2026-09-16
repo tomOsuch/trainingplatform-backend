@@ -10,12 +10,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +31,7 @@ import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapperImpl;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.LastAdminGuard;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AdminUserServiceImpl;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,8 +49,13 @@ class AdminUserServiceImplTest {
     @Spy
     private UserMapper userMapper = new UserMapperImpl();
 
-    @InjectMocks
     private AdminUserServiceImpl adminUserService;
+
+    @BeforeEach
+    void setUp() {
+        adminUserService = new AdminUserServiceImpl(userRepository, userMapper, refreshTokenService,
+                new LastAdminGuard(userRepository));
+    }
 
     private static User account(Long id, Role role, boolean active) {
         return User.builder()
@@ -74,7 +81,7 @@ class AdminUserServiceImplTest {
         assertFalse(target.getIsActive());
         verify(userRepository).save(target);
         verify(refreshTokenService).revokeAllForUser(5L);
-        verify(userRepository, never()).countActiveByRole(any());
+        verify(userRepository, never()).lockActiveByRole(any());
     }
 
     @Test
@@ -107,12 +114,12 @@ class AdminUserServiceImplTest {
     @DisplayName("nie pozwala wyłączyć ostatniego aktywnego administratora — z własnym komunikatem")
     void shouldRejectLastActiveAdmin() {
         stubFound(account(3L, Role.ADMIN, true));
-        when(userRepository.countActiveByRole(Role.ADMIN)).thenReturn(1L);
+        when(userRepository.lockActiveByRole(Role.ADMIN)).thenReturn(List.of(account(3L, Role.ADMIN, true)));
 
         LastAdminException ex = assertThrows(LastAdminException.class,
                 () -> adminUserService.changeStatus(ADMIN_ID, 3L, AccountStatus.INACTIVE));
 
-        assertEquals("To ostatnie aktywne konto administratora — po jego wyłączeniu nikt nie odzyska dostępu do panelu",
+        assertEquals("To ostatnie aktywne konto administratora — bez niego nikt nie odzyska dostępu do panelu",
                 ex.getMessage());
         verify(userRepository, never()).save(any(User.class));
         verify(refreshTokenService, never()).revokeAllForUser(anyLong());
@@ -123,7 +130,8 @@ class AdminUserServiceImplTest {
     void shouldDeactivateAdminWhenAnotherActiveRemains() {
         User target = account(3L, Role.ADMIN, true);
         stubFound(target);
-        when(userRepository.countActiveByRole(Role.ADMIN)).thenReturn(2L);
+        when(userRepository.lockActiveByRole(Role.ADMIN))
+                .thenReturn(List.of(account(3L, Role.ADMIN, true), account(4L, Role.ADMIN, true)));
 
         adminUserService.changeStatus(ADMIN_ID, 3L, AccountStatus.INACTIVE);
 
@@ -138,7 +146,7 @@ class AdminUserServiceImplTest {
 
         adminUserService.changeStatus(ADMIN_ID, 3L, AccountStatus.INACTIVE);
 
-        verify(userRepository, never()).countActiveByRole(any());
+        verify(userRepository, never()).lockActiveByRole(any());
     }
 
     @Test

@@ -1,6 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.exception;
 
-public class RateLimitExceededException extends  RuntimeException {
+public class RateLimitExceededException extends RuntimeException {
 
     private final long retryAfterSeconds;
 

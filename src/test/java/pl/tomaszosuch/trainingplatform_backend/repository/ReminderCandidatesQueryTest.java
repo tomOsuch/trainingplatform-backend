@@ -51,7 +51,7 @@ class ReminderCandidatesQueryTest {
     void setUp() {
         enabled = em.persist(user("chce@example.com", true, true));
         disabled = em.persist(user("niechce@example.com", false, true));
-        category = em.persist(WorkoutCategory.builder().name("Taniec").build());
+        category = em.persist(WorkoutCategory.builder().name("Taniec testowy").build());
     }
 
     private static User user(String email, boolean remindersEnabled, boolean active)  {

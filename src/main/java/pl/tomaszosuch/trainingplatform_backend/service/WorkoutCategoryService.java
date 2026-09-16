@@ -9,7 +9,6 @@ public interface WorkoutCategoryService {
 
     List<WorkoutCategoryResponse> getAllCategories();
     WorkoutCategoryResponse getCategoryById(Long id);
-    WorkoutCategoryResponse getCategoryByName(String name);
     WorkoutCategoryResponse createCategory(WorkoutCategoryRequest request);
     WorkoutCategoryResponse updateCategory(Long id, WorkoutCategoryRequest request);
     void deleteCategory(Long id);
