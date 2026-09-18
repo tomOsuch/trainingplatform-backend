@@ -57,7 +57,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             EmailAlreadyRegisteredException.class,
-            InvitationAlreadyResolvedException.class
+            InvitationAlreadyResolvedException.class,
+            CooperationConflictException.class
     })
     public ResponseEntity<ErrorResponse> handleConflict(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
