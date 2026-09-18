@@ -93,8 +93,10 @@ class CooperationRepositoryTest {
         cooperation(coach, athlete, CooperationStatus.ACTIVE);
         em.flush();
 
-        assertThrows(DataIntegrityViolationException.class,
-                () -> jdbcTemplate.update(INSERT, coach.getId(), athlete.getId(), "PENDING"));
+        DataIntegrityViolationException ex = assertThrows(DataIntegrityViolationException.class,
+                () -> jdbcTemplate.update(INSERT_PENDING, coach.getId(), athlete.getId()));
+
+        assertTrue(ex.getMessage().contains("uq_cooperation_open_pair"));
     }
 
     @Test
