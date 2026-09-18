@@ -41,6 +41,9 @@ public class Cooperation {
     @Column(name = "ended_at")
     private LocalDateTime endedAt;
 
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

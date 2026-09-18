@@ -4,5 +4,6 @@ public enum CooperationStatus {
     PENDING,
     ACTIVE,
     REJECTED,
-    ENDED
+    ENDED,
+    EXPIRED
 }
