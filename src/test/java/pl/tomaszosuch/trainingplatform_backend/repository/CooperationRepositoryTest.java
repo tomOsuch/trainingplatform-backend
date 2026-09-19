@@ -24,6 +24,8 @@ import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 
+import java.time.LocalDateTime;
+
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -37,6 +39,11 @@ class CooperationRepositoryTest {
     private static final String INSERT = """
             INSERT INTO cooperation (coach_id, athlete_id, status, created_at)
             VALUES (?, ?, ?, now())
+            """;
+
+    private static final String INSERT_PENDING = """
+            INSERT INTO cooperation (coach_id, athlete_id, status, created_at, expires_at)
+            VALUES (?, ?, 'PENDING', now(), now() + interval '14 days')
             """;
 
     @Autowired
@@ -69,6 +76,7 @@ class CooperationRepositoryTest {
     private Cooperation cooperation(User coach, User athlete, CooperationStatus status) {
         return em.persist(Cooperation.builder()
                 .coach(coach).athlete(athlete).status(status)
+                .expiresAt(status == CooperationStatus.PENDING ? LocalDateTime.now().plusDays(14) : null)
                 .build());
     }
 
@@ -85,8 +93,10 @@ class CooperationRepositoryTest {
         cooperation(coach, athlete, CooperationStatus.ACTIVE);
         em.flush();
 
-        assertThrows(DataIntegrityViolationException.class,
-                () -> jdbcTemplate.update(INSERT, coach.getId(), athlete.getId(), "PENDING"));
+        DataIntegrityViolationException ex = assertThrows(DataIntegrityViolationException.class,
+                () -> jdbcTemplate.update(INSERT_PENDING, coach.getId(), athlete.getId()));
+
+        assertTrue(ex.getMessage().contains("uq_cooperation_open_pair"));
     }
 
     @Test
@@ -96,10 +106,7 @@ class CooperationRepositoryTest {
         cooperation(coach, athlete, CooperationStatus.REJECTED);
         em.flush();
 
-        jdbcTemplate.update(INSERT, coach.getId(), athlete.getId(), "PENDING");
-
-        assertEquals(3, jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM cooperation WHERE coach_id = ?", Integer.class, coach.getId()));
+        jdbcTemplate.update(INSERT_PENDING, coach.getId(), athlete.getId());
     }
 
     @Test
@@ -158,5 +165,35 @@ class CooperationRepositoryTest {
                 .findByCoachIdAndStatus(athlete.getId(), CooperationStatus.ACTIVE).isEmpty());
         assertFalse(cooperationRepository.existsByCoachIdAndAthleteIdAndStatus(
                 coach.getId(), outsider.getId(), CooperationStatus.ACTIVE));
+    }
+
+
+    @Test
+    @DisplayName("zaproszenie oczekujące musi mieć termin ważności")
+    void shouldRejectPendingWithoutExpiry() {
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbcTemplate.update(INSERT, coach.getId(), athlete.getId(), "PENDING"));
+    }
+
+    @Test
+    @DisplayName("stany inne niż oczekujący nie wymagają terminu")
+    void shouldAllowMissingExpiryForResolvedStates() {
+        jdbcTemplate.update(INSERT, coach.getId(), athlete.getId(), "ACTIVE");
+
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cooperation WHERE expires_at IS NULL", Integer.class));
+    }
+
+    @Test
+    @DisplayName("zaproszenie przeterminowane zwalnia parę kont")
+    void shouldFreePairWhenInvitationExpired() {
+        cooperation(coach, athlete, CooperationStatus.EXPIRED);
+        em.flush();
+
+        // EXPIRED jest poza indeksem uq_cooperation_open_pair, więc nowe zaproszenie przechodzi.
+        jdbcTemplate.update(INSERT_PENDING, coach.getId(), athlete.getId());
+
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cooperation WHERE coach_id = ?", Integer.class, coach.getId()));
     }
 }

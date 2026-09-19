@@ -108,17 +108,47 @@ public class SmtpEmailService implements EmailService {
                 "mail/training-reminder",
                 Map.of("title", planTitle, "categoryName", categoryName, "when", when),
                 """
-                Cześć,
+                        Cześć,
+                        
+                        masz zaplanowany trening — %s.
+                        
+                        %s (%s)
+                        
+                        Po treningu dodaj wpis w dzienniku — dzięki temu zaliczy się do Twoich
+                        celów i statystyk.
+                        
+                        Nie chcesz takich wiadomości? Wyłącz przypomnienia w ustawieniach profilu.
+                        """.formatted(when, planTitle, categoryName));
+    }
 
-                masz zaplanowany trening — %s.
+    @Override
+    public void sendCooperationInvitation(String recipientEmail, String coachName,
+                                          String invitationsUrl, LocalDateTime expiresAt) {
 
-                %s (%s)
+        String expiry = EXPIRY_FORMAT.format(expiresAt);
 
-                Po treningu dodaj wpis w dzienniku — dzięki temu zaliczy się do Twoich
-                celów i statystyk.
-
-                Nie chcesz takich wiadomości? Wyłącz przypomnienia w ustawieniach profilu.
-                """.formatted(when, planTitle, categoryName));
+        send(recipientEmail,
+                "Zaproszenie do współpracy — Platforma Treningowa",
+                "mail/cooperation-invitation",
+                Map.of("coachName", coachName, "url", invitationsUrl, "expiry", expiry),
+                """
+                        Cześć,
+                        
+                        %s zaprasza Cię do współpracy trenerskiej w Platformie Treningowej.
+                        
+                        Po przyjęciu zaproszenia ta osoba będzie widzieć Twoje plany, dziennik,
+                        cele i statystyki oraz będzie mogła układać Ci treningi. Współpracę
+                        możesz zakończyć w każdej chwili.
+                        
+                        Zaproszenie znajdziesz w aplikacji:
+                        
+                        %s
+                        
+                        Jest ważne do %s.
+                        
+                        Jeśli nie znasz tej osoby, po prostu odrzuć zaproszenie — bez Twojej
+                        zgody nikt nie zobaczy Twoich danych.
+                        """.formatted(coachName, invitationsUrl, expiry));
     }
 
     private void send(String recipient, String subject, String template,

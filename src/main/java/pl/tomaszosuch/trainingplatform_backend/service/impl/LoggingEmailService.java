@@ -22,13 +22,13 @@ public class LoggingEmailService implements EmailService {
     @Override
     public void sendInvitation(String recipientEmail, String invitationUrl, LocalDateTime expiresAt) {
         log.info("""
-
-                ─────────── ZAPROSZENIE — tryb lokalny, mail NIE został wysłany ───────────
-                  Do:        {}
-                  Link:      {}
-                  Ważne do:  {}
-                ──────────────────────────────────────────────────────────────────────────
-                """,
+                        
+                        ─────────── ZAPROSZENIE — tryb lokalny, mail NIE został wysłany ───────────
+                          Do:        {}
+                          Link:      {}
+                          Ważne do:  {}
+                        ──────────────────────────────────────────────────────────────────────────
+                        """,
                 recipientEmail, invitationUrl, EXPIRY_FORMAT.format(expiresAt));
     }
 
@@ -41,26 +41,40 @@ public class LoggingEmailService implements EmailService {
     public void sendTrainingReminder(String recipientEmail, String planTitle, String categoryName,
                                      LocalDate plannedDate, LocalTime plannedTime) {
         log.info("""
-
-                ─────────── PRZYPOMNIENIE O TRENINGU — tryb lokalny, mail NIE został wysłany ───────────
-                  Do:        {}
-                  Trening:   {} ({})
-                  Termin:    {} {}
-                ────────────────────────────────────────────────────────────────────────────────────────
-                """,
+                        
+                        ─────────── PRZYPOMNIENIE O TRENINGU — tryb lokalny, mail NIE został wysłany ───────────
+                          Do:        {}
+                          Trening:   {} ({})
+                          Termin:    {} {}
+                        ────────────────────────────────────────────────────────────────────────────────────────
+                        """,
                 recipientEmail, planTitle, categoryName, plannedDate,
                 plannedTime != null ? plannedTime : "(bez godziny)");
     }
 
+    @Override
+    public void sendCooperationInvitation(String recipientEmail, String coachName, String invitationsUrl, LocalDateTime expiresAt) {
+        log.info("""
+                        
+                        ─────────── ZAPROSZENIE DO WSPÓŁPRACY — tryb lokalny, mail NIE został wysłany ───────────
+                          Do:        {}
+                          Od:        {}
+                          Link:      {}
+                          Ważne do:  {}
+                        ─────────────────────────────────────────────────────────────────────────────────────────
+                        """,
+                recipientEmail, coachName, invitationsUrl, EXPIRY_FORMAT.format(expiresAt));
+    }
+
     private void logMail(String kind, String recipient, String url, LocalDateTime expiresAt) {
         log.info("""
-
-                ─────────── {} — tryb lokalny, mail NIE został wysłany ───────────
-                  Do:        {}
-                  Link:      {}
-                  Ważne do:  {}
-                ──────────────────────────────────────────────────────────────────
-                """,
+                        
+                        ─────────── {} — tryb lokalny, mail NIE został wysłany ───────────
+                          Do:        {}
+                          Link:      {}
+                          Ważne do:  {}
+                        ──────────────────────────────────────────────────────────────────
+                        """,
                 kind, recipient, url, EXPIRY_FORMAT.format(expiresAt));
     }
 }

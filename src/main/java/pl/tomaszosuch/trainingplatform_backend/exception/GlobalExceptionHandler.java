@@ -31,7 +31,8 @@ public class GlobalExceptionHandler {
             WorkoutLogNotFoundException.class,
             InvitationNotFoundException.class,
             GoalNotFoundException.class,
-            WorkoutTemplateNotFoundException.class
+            WorkoutTemplateNotFoundException.class,
+            CooperationNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -57,7 +58,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             EmailAlreadyRegisteredException.class,
-            InvitationAlreadyResolvedException.class
+            InvitationAlreadyResolvedException.class,
+            CooperationConflictException.class
     })
     public ResponseEntity<ErrorResponse> handleConflict(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

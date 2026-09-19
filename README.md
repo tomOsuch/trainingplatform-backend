@@ -265,6 +265,14 @@ Błędne hasło daje **`400`, nie `401`** — użytkownik jest zalogowany, a tok
 
 Mailpit jest częścią `docker-compose.yml`, przyjmuje pocztę na porcie 1025 i **niczego nie przekazuje dalej**. Przejście na dostawcę produkcyjnego to zmiana zmiennych `MAIL_*`, bez zmian w kodzie.
 
+**Które wiadomości wymagają zgody.** NF-18 mówi, że wiadomość niezwiązana z obsługą
+konta wymaga uprzedniej zgody odbiorcy. Zaproszenie do platformy, reset hasła i
+zaproszenie do współpracy **dotyczą konta odbiorcy i wymagają jego decyzji**, więc
+mieszczą się w obsłudze konta i idą niezależnie od przełącznika przypomnień.
+Przypomnienie o treningu jest inne — to wiadomość marketingowo-motywacyjna i podlega
+ustawieniu w profilu. Reguła rozstrzygająca: czy odbiorca musi coś z tą wiadomością
+zrobić, żeby jego konto działało zgodnie z jego wolą.
+
 Niepowodzenie wysyłki **nie wywraca operacji** — zaproszenie zostaje zapisane z pustym `sent_at`, a błąd trafia do logu.
 
 ---
