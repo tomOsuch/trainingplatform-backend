@@ -4,9 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -52,6 +50,9 @@ class CooperationServiceImplTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private EmailService emailService;
+
     private CooperationServiceImpl service;
 
     private User coach;
@@ -64,9 +65,11 @@ class CooperationServiceImplTest {
 
         CooperationProperties properties = new CooperationProperties();
         properties.setInvitationExpirationDays(14);
+        properties.setInvitationsUrl("http://localhost:3000/wspolpraca/zaproszenia");
 
         CooperationMapper mapper = new CooperationMapperImpl();
-        service = new CooperationServiceImpl(cooperationRepository, userRepository, mapper, properties);
+        service = new CooperationServiceImpl(cooperationRepository, userRepository, mapper,
+                properties, emailService);
     }
 
     private static User user(Long id, String email) {
@@ -231,5 +234,36 @@ class CooperationServiceImplTest {
                         invitation(CooperationStatus.PENDING, LocalDateTime.now().minusDays(1))));
 
         assertEquals(1, service.receivedInvitations(ATHLETE_ID).size());
+    }
+
+    @Test
+    @DisplayName("zaproszenie idzie mailem do adresata, z nazwiskiem zapraszającego")
+    void shouldSendInvitationEmail() {
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        givenPairIsFree();
+        when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL));
+
+        verify(emailService).sendCooperationInvitation(
+                eq(ATHLETE_EMAIL), eq("Jan Testowy"),
+                eq("http://localhost:3000/wspolpraca/zaproszenia"), any());
+    }
+
+    @Test
+    @DisplayName("niedostępna poczta nie kasuje zaproszenia")
+    void shouldKeepInvitationWhenDeliveryFails() {
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        givenPairIsFree();
+        when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
+        doThrow(new RuntimeException("Dostawca niedostępny"))
+                .when(emailService).sendCooperationInvitation(any(), any(), any(), any());
+
+        assertEquals(CooperationStatus.PENDING,
+                service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL)).status());
+
+        verify(cooperationRepository).save(any(Cooperation.class));
     }
 }

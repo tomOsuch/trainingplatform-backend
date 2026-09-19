@@ -21,6 +21,7 @@ import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.CooperationService;
 
 import org.springframework.security.access.AccessDeniedException;
+import pl.tomaszosuch.trainingplatform_backend.service.EmailService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -46,6 +47,7 @@ public class CooperationServiceImpl implements CooperationService {
     private final UserRepository userRepository;
     private final CooperationMapper cooperationMapper;
     private final CooperationProperties properties;
+    private final EmailService emailService;
 
     @Override
     public CooperationInvitationResponse invite(Long coachId, CooperationInviteRequest request) {
@@ -73,6 +75,8 @@ public class CooperationServiceImpl implements CooperationService {
 
         log.info("Użytkownik {} zaprosił do współpracy {} (zaproszenie id={})",
                 coachId, athlete.getId(), invitation.getId());
+
+        deliver(invitation);
 
         return cooperationMapper.toResponse(invitation);
     }
@@ -141,6 +145,24 @@ public class CooperationServiceImpl implements CooperationService {
         cooperationRepository.saveAndFlush(invitation);
 
         log.info("Zaproszenie id={} wygasło i zostało domknięte", invitation.getId());
+    }
+
+    private void deliver(Cooperation invitation) {
+        try {
+            emailService.sendCooperationInvitation(
+                    invitation.getAthlete().getEmail(),
+                    fullName(invitation.getCoach()),
+                    properties.getInvitationsUrl(),
+                    invitation.getExpiresAt());
+
+        } catch (RuntimeException ex) {
+            log.error("Nie udało się wysłać zaproszenia do współpracy (id={}) na adres {}: {}",
+                    invitation.getId(), invitation.getAthlete().getEmail(), ex.getMessage(), ex);
+        }
+    }
+
+    private static String fullName(User user) {
+        return user.getFirstName() + " " + user.getLastName();
     }
 
     private static boolean hasExpired(Cooperation invitation) {

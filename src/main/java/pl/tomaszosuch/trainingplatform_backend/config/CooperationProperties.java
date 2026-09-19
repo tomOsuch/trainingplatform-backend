@@ -1,5 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.config;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,4 +15,7 @@ public class CooperationProperties {
 
     @Positive
     private int invitationExpirationDays;
+
+    @NotBlank
+    private String invitationsUrl;
 }

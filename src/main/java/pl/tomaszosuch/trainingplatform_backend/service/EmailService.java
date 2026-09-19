@@ -12,4 +12,7 @@ public interface EmailService {
 
     void sendTrainingReminder(String recipientEmail, String planTitle, String categoryName,
                               LocalDate plannedDate, LocalTime plannedTime);
+
+    void sendCooperationInvitation(String recipientEmail, String coachName,
+                                   String invitationsUrl, LocalDateTime expiresAt);
 }

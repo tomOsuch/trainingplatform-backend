@@ -25,6 +25,7 @@ app:
     accept-base-url: http://localhost:3000/register
   cooperation:
     invitation-expiration-days: 14
+    invitations-url: http://localhost:3000/wspolpraca/zaproszenia
   password-reset:
     expiration-minutes: 60
     reset-base-url: http://localhost:3000/reset-password
