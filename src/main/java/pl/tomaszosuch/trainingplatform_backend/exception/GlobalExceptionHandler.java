@@ -31,7 +31,8 @@ public class GlobalExceptionHandler {
             WorkoutLogNotFoundException.class,
             InvitationNotFoundException.class,
             GoalNotFoundException.class,
-            WorkoutTemplateNotFoundException.class
+            WorkoutTemplateNotFoundException.class,
+            CooperationNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

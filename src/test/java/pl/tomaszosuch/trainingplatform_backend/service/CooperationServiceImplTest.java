@@ -123,6 +123,18 @@ class CooperationServiceImplTest {
     }
 
     @Test
+    @DisplayName("konta wyłączonego nie da się zaprosić — tak samo jak nieistniejącego")
+    void shouldRejectInactiveRecipient() {
+        athlete.setIsActive(false);
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+
+        assertThrows(UserNotFoundException.class,
+                () -> service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL)));
+
+        verify(cooperationRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("nie można zaprosić samego siebie")
     void shouldRejectSelfInvite() {
         when(userRepository.findByEmail("trener@example.com")).thenReturn(Optional.of(coach));
@@ -201,7 +213,8 @@ class CooperationServiceImplTest {
                 () -> service.respond(ATHLETE_ID, 10L,
                         new InvitationDecisionRequest(InvitationDecision.ACCEPTED)));
 
-        assertEquals(CooperationStatus.EXPIRED, stale.getStatus());
+        assertEquals(CooperationStatus.PENDING, stale.getStatus());
+        verify(cooperationRepository, never()).saveAndFlush(any());
     }
 
     @Test

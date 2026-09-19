@@ -55,6 +55,7 @@ public class CooperationServiceImpl implements CooperationService {
         String email = request.email().trim();
 
         User athlete = userRepository.findByEmail(email)
+                .filter(User::getIsActive)
                 .orElseThrow(() -> new UserNotFoundException(email));
 
         if (athlete.getId().equals(coachId)) {
@@ -104,7 +105,6 @@ public class CooperationServiceImpl implements CooperationService {
         }
 
         if (hasExpired(invitation)) {
-            expire(invitation);
             throw new CooperationConflictException(EXPIRED_MESSAGE);
         }
 
