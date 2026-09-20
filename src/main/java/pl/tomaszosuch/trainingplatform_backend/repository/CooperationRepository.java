@@ -14,7 +14,9 @@ import java.util.Optional;
 @Repository
 public interface CooperationRepository extends JpaRepository<Cooperation, Long> {
 
-    List<Cooperation> findByCoachIdAndStatus(Long coachId, CooperationStatus status);
+    @Query("SELECT c FROM Cooperation c JOIN FETCH c.athlete WHERE c.coach.id = :coachId AND c.status = :status")
+    List<Cooperation> findByCoachIdAndStatus(@Param("coachId") Long coachId,
+                                             @Param("status") CooperationStatus status);
 
     @Query("SELECT c FROM Cooperation c JOIN FETCH c.coach WHERE c.athlete.id = :athleteId AND c.status = :status")
     List<Cooperation> findByAthleteIdAndStatus(@Param("athleteId") Long athleteId,

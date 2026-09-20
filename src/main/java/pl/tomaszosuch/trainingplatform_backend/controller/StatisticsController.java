@@ -12,6 +12,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.response.StatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.WeeklyStatisticsResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.service.StatisticsService;
+import pl.tomaszosuch.trainingplatform_backend.service.model.StatisticsRange;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -32,18 +33,10 @@ public class StatisticsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
 
-        LocalDate rangeFrom = from;
-        LocalDate rangeTo = to;
-        if (from == null && to == null) {
-            YearMonth currentMonth = YearMonth.now();
-            rangeFrom = currentMonth.atDay(1);
-            rangeTo = currentMonth.atEndOfMonth();
-        } else if (from == null || to == null) {
-            // Uzupełnianie brakującej połówki byłoby zgadywaniem okresu za użytkownika.
-            throw new IllegalArgumentException(PARTIAL_RANGE_MESSAGE);
-        }
+        StatisticsRange range = StatisticsRange.of(from, to);
 
-        return ResponseEntity.ok(statisticsService.statistics(currentUser.getId(), rangeFrom, rangeTo));
+        return ResponseEntity.ok(
+                statisticsService.statistics(currentUser.getId(), range.from(), range.to()));
     }
 
     @GetMapping("/weekly")
