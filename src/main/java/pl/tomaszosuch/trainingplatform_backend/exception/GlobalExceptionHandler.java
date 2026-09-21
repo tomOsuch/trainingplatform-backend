@@ -72,8 +72,12 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(403, "Brak uprawnień"));
     }
 
-    @ExceptionHandler(SelfDeactivationException.class)
-    public ResponseEntity<ErrorResponse> handleSelfDeactivation(SelfDeactivationException ex) {
+    @ExceptionHandler({
+            SelfDeactivationException.class,
+            LastAdminException.class,
+            PlanAuthorshipException.class
+    })
+    public ResponseEntity<ErrorResponse> handleForbiddenWithReason(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(new ErrorResponse(403, ex.getMessage()));
     }
@@ -82,12 +86,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(400, "Niepoprawny format treści żądania"));
-    }
-
-    @ExceptionHandler(LastAdminException.class)
-    public ResponseEntity<ErrorResponse> handleLastAdmin(LastAdminException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new ErrorResponse(403, ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

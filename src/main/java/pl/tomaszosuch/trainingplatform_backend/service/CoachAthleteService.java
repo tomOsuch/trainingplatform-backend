@@ -3,6 +3,7 @@ package pl.tomaszosuch.trainingplatform_backend.service;
 import java.time.LocalDate;
 import java.util.List;
 
+import pl.tomaszosuch.trainingplatform_backend.dto.request.TrainingPlanRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.*;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalStatus;
 
@@ -11,6 +12,11 @@ public interface CoachAthleteService {
     List<AthleteResponse> athletes(Long coachId);
 
     List<TrainingPlanResponse> trainingPlans(Long coachId, Long athleteId, LocalDate from, LocalDate to);
+
+    TrainingPlanResponse createTrainingPlan(Long coachId, Long athleteId, TrainingPlanRequest request);
+
+    TrainingPlanResponse updateTrainingPlan(Long coachId, Long athleteId, Long planId,
+                                            TrainingPlanRequest request);
 
     List<WorkoutLogResponse> workoutLogs(Long coachId, Long athleteId, Long categoryId,
                                          LocalDate from, LocalDate to);

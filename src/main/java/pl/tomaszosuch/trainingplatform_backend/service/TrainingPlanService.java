@@ -17,6 +17,11 @@ public interface TrainingPlanService {
 
     TrainingPlanResponse updateTrainingPlan(Long userId, Long id, TrainingPlanRequest request);
 
+    TrainingPlanResponse createTrainingPlanForAthlete(Long athleteId, Long coachId, TrainingPlanRequest request);
+
+    TrainingPlanResponse updateTrainingPlanForAthlete(Long athleteId, Long coachId, Long planId,
+                                                      TrainingPlanRequest request);
+
     TrainingPlanResponse changeStatus(Long userId, Long trainingPlanId, StatusUpdateRequest request);
 
     void deleteTrainingPlan(Long userId, Long trainingPlanId);

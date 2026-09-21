@@ -6,7 +6,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
@@ -29,7 +33,16 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+
+import org.springframework.http.MediaType;
+
+import pl.tomaszosuch.trainingplatform_backend.dto.request.TrainingPlanRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.AthleteResponse;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.TrainingPlanResponse;
+import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
+import pl.tomaszosuch.trainingplatform_backend.exception.PlanAuthorshipException;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
@@ -45,6 +58,11 @@ class CoachAthleteControllerTest {
     @TestConfiguration
     @EnableMethodSecurity
     static class TestConfig {
+        @Bean
+        ObjectMapper objectMapper() {
+            return new ObjectMapper().findAndRegisterModules()
+                    .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        }
     }
 
     private static final String GUARD_MESSAGE = "Nie prowadzisz tej osoby";
@@ -57,7 +75,11 @@ class CoachAthleteControllerTest {
     @MockitoBean
     private CoachAthleteService coachAthleteService;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     private User currentUser;
+    private TrainingPlanRequest validRequest;
 
     @BeforeEach
     void setUp() {
@@ -65,6 +87,9 @@ class CoachAthleteControllerTest {
                 .id(1L).email("trener@example.com").firstName("Jan").lastName("Kowalski")
                 .role(Role.USER).isActive(true)
                 .build();
+
+        validRequest = new TrainingPlanRequest(
+                "Interwały", 5L, LocalDate.now().plusDays(2), null, 45, null);
     }
 
     @Test
@@ -196,4 +221,54 @@ class CoachAthleteControllerTest {
 
         verify(coachAthleteService).goals(eq(1L), eq(ATHLETE_ID), eq(GoalStatus.ACTIVE));
     }
+
+    @Test
+    @DisplayName("tworzenie planu bez relacji: 403")
+    void shouldReturn403WhenCreatingPlanWithoutCooperation() throws Exception {
+        when(coachAthleteService.createTrainingPlan(anyLong(), anyLong(), any()))
+                .thenThrow(new AccessDeniedException(GUARD_MESSAGE));
+
+        mockMvc.perform(post("/coach/athletes/2/training-plans")
+                        .with(user(currentUser)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(RESPONSE_MESSAGE));
+    }
+
+    @Test
+    @DisplayName("edycja cudzego planu: 403 z konkretnym powodem")
+    void shouldReturn403WithReasonWhenEditingForeignPlan() throws Exception {
+        when(coachAthleteService.updateTrainingPlan(anyLong(), anyLong(), anyLong(), any()))
+                .thenThrow(new PlanAuthorshipException());
+
+        mockMvc.perform(put("/coach/athletes/2/training-plans/10")
+                        .with(user(currentUser)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message")
+                        .value("Możesz edytować tylko plany, które sam ułożyłeś"));
+    }
+
+    @Test
+    @DisplayName("utworzony plan wraca z 201 i oznaczeniem autorstwa")
+    void shouldReturn201WithAuthorship() throws Exception {
+        TrainingPlanResponse created = new TrainingPlanResponse(
+                10L, "Interwały", 5L, "Taniec", "#9B59B6", "music",
+                LocalDate.now().plusDays(2), null, 45, null, PlanStatus.PLANNED, true, "Jan Kowalski");
+
+        when(coachAthleteService.createTrainingPlan(eq(1L), eq(ATHLETE_ID), any())).thenReturn(created);
+
+        mockMvc.perform(post("/coach/athletes/2/training-plans")
+                        .with(user(currentUser)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.createdByCoach").value(true))
+                .andExpect(jsonPath("$.createdByName").value("Jan Kowalski"));
+
+        verify(coachAthleteService).createTrainingPlan(1L, ATHLETE_ID, validRequest);
+    }
+
 }
