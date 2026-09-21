@@ -45,6 +45,10 @@ public class TrainingPlan {
     @JoinColumn(name = "category_id", nullable = false)
     private WorkoutCategory category;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_user_id")
+    private User createdBy;
+
     @Column(nullable = false, length = 200)
     private String title;
 

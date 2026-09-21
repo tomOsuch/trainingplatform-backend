@@ -74,7 +74,7 @@ public class TrainingPlanControllerTest {
 
         planResponse = new TrainingPlanResponse(
                 10L, "Salsa wieczorna", 5L, "Taniec", "#9B59B6", "music",
-                LocalDate.now().plusDays(3), null, 60, null, PlanStatus.PLANNED);
+                LocalDate.now().plusDays(3), null, 60, null, PlanStatus.PLANNED, false, null);
 
         validRequest = new TrainingPlanRequest(
                 "Salsa wieczorna", 5L,

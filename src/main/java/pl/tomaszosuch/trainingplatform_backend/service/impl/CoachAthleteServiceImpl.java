@@ -3,6 +3,7 @@ package pl.tomaszosuch.trainingplatform_backend.service.impl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.TrainingPlanRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.*;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.GoalStatus;
@@ -39,6 +40,21 @@ public class CoachAthleteServiceImpl implements CoachAthleteService {
     public List<TrainingPlanResponse> trainingPlans(Long coachId, Long athleteId, LocalDate from, LocalDate to) {
         athleteAccessGuard.requireActiveCooperation(coachId, athleteId);
         return trainingPlanService.getTrainingPlansByUserId(athleteId, from, to);
+    }
+
+    @Override
+    @Transactional
+    public TrainingPlanResponse createTrainingPlan(Long coachId, Long athleteId, TrainingPlanRequest request) {
+        athleteAccessGuard.requireActiveCooperation(coachId, athleteId);
+        return trainingPlanService.createTrainingPlanForAthlete(athleteId, coachId, request);
+    }
+
+    @Override
+    @Transactional
+    public TrainingPlanResponse updateTrainingPlan(Long coachId, Long athleteId, Long planId,
+                                                   TrainingPlanRequest request) {
+        athleteAccessGuard.requireActiveCooperation(coachId, athleteId);
+        return trainingPlanService.updateTrainingPlanForAthlete(athleteId, coachId, planId, request);
     }
 
     @Override

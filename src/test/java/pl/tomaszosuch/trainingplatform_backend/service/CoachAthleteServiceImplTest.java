@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
+import pl.tomaszosuch.trainingplatform_backend.dto.request.TrainingPlanRequest;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.mapper.CooperationMapper;
 import pl.tomaszosuch.trainingplatform_backend.mapper.CooperationMapperImpl;
@@ -34,6 +35,9 @@ class CoachAthleteServiceImplTest {
     private static final Long ATHLETE_ID = 2L;
     private static final LocalDate FROM = LocalDate.of(2026, 3, 1);
     private static final LocalDate TO = LocalDate.of(2026, 3, 31);
+    private static final Long PLAN_ID = 30L;
+    private static final TrainingPlanRequest REQUEST = new TrainingPlanRequest(
+            "Interwały", 5L, LocalDate.of(2026, 3, 10), null, 45, null);
 
     @Mock
     private AthleteAccessGuard athleteAccessGuard;
@@ -136,4 +140,35 @@ class CoachAthleteServiceImplTest {
 
         verify(athleteAccessGuard, never()).requireActiveCooperation(anyLong(), anyLong());
     }
+
+    @Test
+    @DisplayName("brak relacji blokuje utworzenie planu i nie sięga do serwisu")
+    void shouldDenyPlanCreation() {
+        givenNoCooperation();
+
+        assertThrows(AccessDeniedException.class,
+                () -> service.createTrainingPlan(COACH_ID, ATHLETE_ID, REQUEST));
+
+        verify(trainingPlanService, never()).createTrainingPlanForAthlete(anyLong(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("brak relacji blokuje edycję planu i nie sięga do serwisu")
+    void shouldDenyPlanUpdate() {
+        givenNoCooperation();
+
+        assertThrows(AccessDeniedException.class,
+                () -> service.updateTrainingPlan(COACH_ID, ATHLETE_ID, PLAN_ID, REQUEST));
+
+        verify(trainingPlanService, never()).updateTrainingPlanForAthlete(anyLong(), anyLong(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("plan zapisywany jest na koncie podopiecznego, autorstwo na trenerze")
+    void shouldCreatePlanWithAthleteIdAndCoachAsAuthor() {
+        service.createTrainingPlan(COACH_ID, ATHLETE_ID, REQUEST);
+
+        verify(trainingPlanService).createTrainingPlanForAthlete(ATHLETE_ID, COACH_ID, REQUEST);
+    }
+
 }

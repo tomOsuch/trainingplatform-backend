@@ -14,6 +14,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.response.TrainingPlanResponse
 import pl.tomaszosuch.trainingplatform_backend.entity.TrainingPlan;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
+import pl.tomaszosuch.trainingplatform_backend.exception.PlanAuthorshipException;
 import pl.tomaszosuch.trainingplatform_backend.exception.TrainingPlanNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.exception.WorkoutCategoryNotFoundException;
@@ -66,18 +67,36 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     @Override
     public TrainingPlanResponse createTrainingPlan(Long userId, TrainingPlanRequest request) {
 
+        return create(userId, null, request);
+    }
+
+    @Override
+    public TrainingPlanResponse createTrainingPlanForAthlete(Long athleteId, Long coachId,
+            TrainingPlanRequest request) {
+
+        return create(athleteId, coachId, request);
+    }
+
+    private TrainingPlanResponse create(Long ownerId, Long authorId, TrainingPlanRequest request) {
+
         if (request.plannedDate().isBefore(LocalDate.now())) {
             throw new IllegalArgumentException(PAST_DATE_MESSAGE);
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(userId));
+        User owner = userRepository.findById(ownerId)
+                .orElseThrow(() -> new UserNotFoundException(ownerId));
+
+        User author = authorId == null
+                ? null
+                : userRepository.findById(authorId)
+                        .orElseThrow(() -> new UserNotFoundException(authorId));
 
         WorkoutCategory category = workoutCategoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new WorkoutCategoryNotFoundException(request.categoryId()));
 
         TrainingPlan plan = TrainingPlan.builder()
-                .user(user)
+                .user(owner)
+                .createdBy(author)
                 .category(category)
                 .title(request.title())
                 .plannedDate(request.plannedDate())
@@ -92,10 +111,24 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
     @Override
     public TrainingPlanResponse updateTrainingPlan(Long userId, Long id, TrainingPlanRequest request) {
 
-        TrainingPlan plan = findOwnedPlan(id, userId);
+        return applyChanges(findOwnedPlan(id, userId), request);
+    }
 
-        // Data z przeszłości jest dozwolona tylko wtedy, gdy użytkownik jej nie zmienia
-        // (edycja starego planu).
+    @Override
+    public TrainingPlanResponse updateTrainingPlanForAthlete(Long athleteId, Long coachId, Long planId,
+            TrainingPlanRequest request) {
+
+        TrainingPlan plan = findOwnedPlan(planId, athleteId);
+
+        if (plan.getCreatedBy() == null || !plan.getCreatedBy().getId().equals(coachId)) {
+            throw new PlanAuthorshipException();
+        }
+
+        return applyChanges(plan, request);
+    }
+
+    private TrainingPlanResponse applyChanges(TrainingPlan plan, TrainingPlanRequest request) {
+
         if (!request.plannedDate().equals(plan.getPlannedDate())
                 && request.plannedDate().isBefore(LocalDate.now())) {
             throw new IllegalArgumentException(PAST_DATE_MESSAGE);
@@ -129,8 +162,6 @@ public class TrainingPlanServiceImpl implements TrainingPlanService {
 
         TrainingPlan plan = findOwnedPlan(trainingPlanId, userId);
 
-        // Wpisy w dzienniku to historia wykonanych treningów - nie kasujemy ich razem
-        // z planem, tylko odpinamy (stają się wpisami ad-hoc).
         workoutLogRepository.detachLogsFromPlan(trainingPlanId);
 
         trainingPlanRepository.delete(plan);

@@ -28,6 +28,7 @@ import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutCategory;
 import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
+import pl.tomaszosuch.trainingplatform_backend.exception.PlanAuthorshipException;
 import pl.tomaszosuch.trainingplatform_backend.exception.TrainingPlanNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.exception.WorkoutCategoryNotFoundException;
@@ -61,6 +62,7 @@ public class TrainingPlanServiceImplTest {
     private TrainingPlanServiceImpl planService;
 
     private User owner;
+    private User coach;
     private WorkoutCategory category;
     private TrainingPlan plan;
     private TrainingPlanResponse planResponse;
@@ -69,6 +71,7 @@ public class TrainingPlanServiceImplTest {
     private static final Long OTHER_USER_ID = 2L;
     private static final Long PLAN_ID = 10L;
     private static final Long CATEGORY_ID = 5L;
+    private static final Long COACH_ID = 7L;
 
     @BeforeEach
     void setUp() {
@@ -77,6 +80,15 @@ public class TrainingPlanServiceImplTest {
                 .email("jan@example.com")
                 .firstName("Jan")
                 .lastName("Kowalski")
+                .role(Role.USER)
+                .isActive(true)
+                .build();
+
+        coach = User.builder()
+                .id(COACH_ID)
+                .email("trener@example.com")
+                .firstName("Anna")
+                .lastName("Nowak")
                 .role(Role.USER)
                 .isActive(true)
                 .build();
@@ -100,7 +112,7 @@ public class TrainingPlanServiceImplTest {
 
         planResponse = new TrainingPlanResponse(
                 PLAN_ID, "Salsa wieczorna", CATEGORY_ID, "Taniec", "#9B59B6", "music",
-                LocalDate.now().plusDays(3), null, 60, null, PlanStatus.PLANNED);
+                LocalDate.now().plusDays(3), null, 60, null, PlanStatus.PLANNED, false, null);
     }
 
     @Test
@@ -298,6 +310,138 @@ public class TrainingPlanServiceImplTest {
                 () -> planService.updateTrainingPlan(OWNER_ID, PLAN_ID, request));
 
         verify(planRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("trener tworzy plan NA KONCIE podopiecznego, z sobą jako autorem")
+    void shouldCreatePlanOwnedByAthleteAuthoredByCoach() {
+        TrainingPlanRequest request = new TrainingPlanRequest(
+                "Interwały", CATEGORY_ID, LocalDate.now().plusDays(2), null, 45, null);
+
+        when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
+        when(planRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        planService.createTrainingPlanForAthlete(OWNER_ID, COACH_ID, request);
+
+        verify(planRepository).save(argThat(saved -> saved.getUser().getId().equals(OWNER_ID)
+                && saved.getCreatedBy().getId().equals(COACH_ID)));
+    }
+
+    @Test
+    @DisplayName("plan ułożony przez właściciela nie ma autora - NULL, nie on sam")
+    void shouldLeaveAuthorEmptyForSelfCreatedPlan() {
+        TrainingPlanRequest request = new TrainingPlanRequest(
+                "Salsa", CATEGORY_ID, LocalDate.now().plusDays(1), null, 60, null);
+
+        when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
+        when(planRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        planService.createTrainingPlan(OWNER_ID, request);
+
+        verify(planRepository).save(argThat(saved -> saved.getCreatedBy() == null));
+    }
+
+    @Test
+    @DisplayName("BR-11 obowiązuje trenera tak samo: data z przeszłości odrzucona")
+    void shouldRejectPastDateFromCoach() {
+        TrainingPlanRequest request = new TrainingPlanRequest(
+                "Interwały", CATEGORY_ID, LocalDate.now().minusDays(1), null, 45, null);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> planService.createTrainingPlanForAthlete(OWNER_ID, COACH_ID, request));
+
+        verify(planRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("trener nie ruszy planu, który podopieczny ułożył sobie sam")
+    void shouldRejectCoachEditOfSelfCreatedPlan() {
+        TrainingPlanRequest request = new TrainingPlanRequest(
+                "Zmiana", CATEGORY_ID, LocalDate.now().plusDays(3), null, 60, null);
+
+        when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+
+        assertThrows(PlanAuthorshipException.class,
+                () -> planService.updateTrainingPlanForAthlete(OWNER_ID, COACH_ID, PLAN_ID, request));
+
+        verify(planRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("trener nie ruszy planu ułożonego przez innego trenera")
+    void shouldRejectCoachEditOfForeignCoachPlan() {
+        TrainingPlanRequest request = new TrainingPlanRequest(
+                "Zmiana", CATEGORY_ID, LocalDate.now().plusDays(3), null, 60, null);
+
+        plan.setCreatedBy(User.builder().id(99L).build());
+        when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+
+        assertThrows(PlanAuthorshipException.class,
+                () -> planService.updateTrainingPlanForAthlete(OWNER_ID, COACH_ID, PLAN_ID, request));
+
+        verify(planRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("trener poprawia własny plan podopiecznego")
+    void shouldAllowCoachEditOfOwnPlan() {
+        TrainingPlanRequest request = new TrainingPlanRequest(
+                "Interwały v2", CATEGORY_ID, LocalDate.now().plusDays(4), null, 50, null);
+
+        plan.setCreatedBy(coach);
+        when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
+        when(planRepository.save(plan)).thenReturn(plan);
+        when(planMapper.toResponse(plan)).thenReturn(planResponse);
+
+        planService.updateTrainingPlanForAthlete(OWNER_ID, COACH_ID, PLAN_ID, request);
+
+        verify(planRepository).save(argThat(saved -> "Interwały v2".equals(saved.getTitle())
+                && saved.getCreatedBy().getId().equals(COACH_ID)));
+    }
+
+    @Test
+    @DisplayName("trener nie sięgnie po plan osoby, której nie prowadzi - 403 od właściciela")
+    void shouldDenyCoachEditOfPlanOfAnotherUser() {
+        TrainingPlanRequest request = new TrainingPlanRequest(
+                "Zmiana", CATEGORY_ID, LocalDate.now().plusDays(3), null, 60, null);
+
+        plan.setCreatedBy(coach);
+        when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+
+        assertThrows(AccessDeniedException.class,
+                () -> planService.updateTrainingPlanForAthlete(OTHER_USER_ID, COACH_ID, PLAN_ID, request));
+    }
+
+    @Test
+    @DisplayName("podopieczny edytuje plan od trenera - to jego kalendarz")
+    void shouldAllowAthleteToEditCoachPlan() {
+        TrainingPlanRequest request = new TrainingPlanRequest(
+                "Po mojemu", CATEGORY_ID, LocalDate.now().plusDays(5), null, 30, null);
+
+        plan.setCreatedBy(coach);
+        when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
+        when(planRepository.save(plan)).thenReturn(plan);
+        when(planMapper.toResponse(plan)).thenReturn(planResponse);
+
+        planService.updateTrainingPlan(OWNER_ID, PLAN_ID, request);
+
+        verify(planRepository).save(argThat(saved -> "Po mojemu".equals(saved.getTitle())));
+    }
+
+    @Test
+    @DisplayName("podopieczny usuwa plan od trenera")
+    void shouldAllowAthleteToDeleteCoachPlan() {
+        plan.setCreatedBy(coach);
+        when(planRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan));
+
+        planService.deleteTrainingPlan(OWNER_ID, PLAN_ID);
+
+        verify(planRepository).delete(plan);
     }
 
 }

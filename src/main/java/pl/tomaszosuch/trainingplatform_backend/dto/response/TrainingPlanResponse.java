@@ -7,17 +7,19 @@ import pl.tomaszosuch.trainingplatform_backend.enums.PlanStatus;
 
 public record TrainingPlanResponse(
 
-    Long id,
-    String title,
-    Long categoryId,
-    String categoryName,
-    String categoryColor,
-    String categoryIconName,
-    LocalDate plannedDate,
-    LocalTime plannedTime,
-    Integer durationMin,
-    String notes,
-    PlanStatus status
+        Long id,
+        String title,
+        Long categoryId,
+        String categoryName,
+        String categoryColor,
+        String categoryIconName,
+        LocalDate plannedDate,
+        LocalTime plannedTime,
+        Integer durationMin,
+        String notes,
+        PlanStatus status,
+        boolean createdByCoach,
+        String createdByName
 ) {
 
 }
