@@ -39,15 +39,9 @@ public class WorkoutLogServiceImpl implements WorkoutLogService {
     @Override
     @Transactional(readOnly = true)
     public List<WorkoutLogResponse> getUserLogs(Long userId, Long categoryId, LocalDate from, LocalDate to) {
-        List<WorkoutLog> logs;
-        if (categoryId != null) {
-            logs = workoutLogRepository.findByUserIdAndCategoryIdOrderByPerformedDateDesc(userId, categoryId);
-        } else if (from != null && to != null) {
-            logs = workoutLogRepository.findByUserIdAndPerformedDateBetweenOrderByPerformedDateDesc(userId, from, to);
-        } else {
-            logs = workoutLogRepository.findByUserIdOrderByPerformedDateDesc(userId);
-        }
-        return logs.stream().map(workoutLogMapper::toResponse).toList();
+        return workoutLogRepository.findFiltered(userId, categoryId, from, to).stream()
+                .map(workoutLogMapper::toResponse)
+                .toList();
     }
 
     @Override

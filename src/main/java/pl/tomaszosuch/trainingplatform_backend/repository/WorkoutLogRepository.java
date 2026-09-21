@@ -17,11 +17,6 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long>, J
 
     List<WorkoutLog> findByUserIdOrderByPerformedDateDesc(Long userId);
 
-    List<WorkoutLog> findByUserIdAndPerformedDateBetweenOrderByPerformedDateDesc(Long userId, LocalDate from,
-                                                                                 LocalDate to);
-
-    List<WorkoutLog> findByUserIdAndCategoryIdOrderByPerformedDateDesc(Long userId, Long categoryId);
-
     boolean existsByCategoryId(Long categoryId);
 
     @Modifying(flushAutomatically = true)
@@ -74,5 +69,18 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long>, J
     PeriodStatsView aggregatePeriod(@Param("userId") Long userId,
                                     @Param("from") LocalDate from,
                                     @Param("to") LocalDate to);
+
+    @Query("""
+            SELECT l FROM WorkoutLog l
+            WHERE l.user.id = :userId
+              AND (:categoryId IS NULL OR l.category.id = :categoryId)
+              AND (CAST(:from AS date) IS NULL OR l.performedDate >= :from)
+              AND (CAST(:to AS date) IS NULL OR l.performedDate <= :to)
+            ORDER BY l.performedDate DESC
+            """)
+    List<WorkoutLog> findFiltered(@Param("userId") Long userId,
+                                  @Param("categoryId") Long categoryId,
+                                  @Param("from") LocalDate from,
+                                  @Param("to") LocalDate to);
 
 }

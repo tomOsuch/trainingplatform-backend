@@ -119,7 +119,7 @@ public class WorkoutLogServiceImplTest {
     @DisplayName("powinien zwrócić wszystkie wpisy gdy brak filtrów")
     public void shouldReturnAllLogsWhenNoFilters() {
         // given
-        when(workoutLogRepository.findByUserIdOrderByPerformedDateDesc(OWNER_ID)).thenReturn(List.of(log));
+        when(workoutLogRepository.findFiltered(OWNER_ID, null, null, null)).thenReturn(List.of(log));
         when(workoutLogMapper.toResponse(log)).thenReturn(logResponse);
 
         // when
@@ -134,15 +134,14 @@ public class WorkoutLogServiceImplTest {
         assertEquals(LocalDate.now(), response.get(0).performedDate());
         assertEquals(60, response.get(0).durationMin());
         assertEquals(7, response.get(0).intensity());
-        verify(workoutLogRepository).findByUserIdOrderByPerformedDateDesc(OWNER_ID);
+        verify(workoutLogRepository).findFiltered(OWNER_ID, null, null, null);
     }
 
     @Test
     @DisplayName("powinien filtrować po kategorii gdy podano categoryId")
     public void shouldFilterByCategoryWhenProvided() {
         // given
-        when(workoutLogRepository.findByUserIdAndCategoryIdOrderByPerformedDateDesc(OWNER_ID, CATEGORY_ID))
-                .thenReturn(List.of(log));
+        when(workoutLogRepository.findFiltered(OWNER_ID, CATEGORY_ID, null, null)).thenReturn(List.of(log));
         when(workoutLogMapper.toResponse(log)).thenReturn(logResponse);
 
         // when
@@ -157,7 +156,7 @@ public class WorkoutLogServiceImplTest {
         assertEquals(LocalDate.now(), response.get(0).performedDate());
         assertEquals(60, response.get(0).durationMin());
         assertEquals(7, response.get(0).intensity());
-        verify(workoutLogRepository).findByUserIdAndCategoryIdOrderByPerformedDateDesc(OWNER_ID, CATEGORY_ID);
+        verify(workoutLogRepository).findFiltered(OWNER_ID, CATEGORY_ID, null, null);
     }
 
     @Test
@@ -166,8 +165,7 @@ public class WorkoutLogServiceImplTest {
         // given
         LocalDate from = LocalDate.now().plusDays(1);
         LocalDate to = LocalDate.now().plusDays(5);
-        when(workoutLogRepository.findByUserIdAndPerformedDateBetweenOrderByPerformedDateDesc(OWNER_ID, from, to))
-                .thenReturn(List.of(log));
+        when(workoutLogRepository.findFiltered(OWNER_ID, null, from, to)).thenReturn(List.of(log));
         when(workoutLogMapper.toResponse(log)).thenReturn(logResponse);
 
         // when
@@ -182,7 +180,7 @@ public class WorkoutLogServiceImplTest {
         assertEquals(LocalDate.now(), response.get(0).performedDate());
         assertEquals(60, response.get(0).durationMin());
         assertEquals(7, response.get(0).intensity());
-        verify(workoutLogRepository).findByUserIdAndPerformedDateBetweenOrderByPerformedDateDesc(OWNER_ID, from, to);
+        verify(workoutLogRepository).findFiltered(OWNER_ID, null, from, to);
     }
 
     @Test
@@ -466,5 +464,18 @@ public class WorkoutLogServiceImplTest {
         workoutLogService.create(OWNER_ID, request);
 
         verify(workoutLogRepository).save(argThat(l -> l.getTitle() == null));
+    }
+
+    @Test
+    @DisplayName("kategoria i zakres dat filtrują razem, nie wykluczają się")
+    public void shouldCombineCategoryAndDateRange() {
+        LocalDate from = LocalDate.now().minusDays(7);
+        LocalDate to = LocalDate.now();
+        when(workoutLogRepository.findFiltered(OWNER_ID, CATEGORY_ID, from, to)).thenReturn(List.of(log));
+        when(workoutLogMapper.toResponse(log)).thenReturn(logResponse);
+
+        assertEquals(1, workoutLogService.getUserLogs(OWNER_ID, CATEGORY_ID, from, to).size());
+
+        verify(workoutLogRepository).findFiltered(OWNER_ID, CATEGORY_ID, from, to);
     }
 }
