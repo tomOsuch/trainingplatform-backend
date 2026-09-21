@@ -8,8 +8,10 @@ import pl.tomaszosuch.trainingplatform_backend.config.CooperationProperties;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.CooperationInviteRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.InvitationDecisionRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.CooperationInvitationResponse;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.CooperationResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.Cooperation;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
+import pl.tomaszosuch.trainingplatform_backend.enums.CooperationRole;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.InvitationDecision;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationConflictException;
@@ -42,6 +44,8 @@ public class CooperationServiceImpl implements CooperationService {
     private static final String ALREADY_RESOLVED_MESSAGE = "To zaproszenie zostało już rozstrzygnięte";
     private static final String EXPIRED_MESSAGE = "Zaproszenie straciło ważność";
     private static final String NOT_ADDRESSEE_MESSAGE = "To zaproszenie nie jest skierowane do Ciebie";
+    private static final String NOT_PARTICIPANT_MESSAGE = "Nie jesteś stroną tej współpracy";
+    private static final String NOT_ACTIVE_MESSAGE = "Ta współpraca nie jest aktywna";
 
     private final CooperationRepository cooperationRepository;
     private final UserRepository userRepository;
@@ -117,6 +121,67 @@ public class CooperationServiceImpl implements CooperationService {
                 athleteId, invitationId, invitation.getStatus());
 
         return cooperationMapper.toResponse(cooperationRepository.save(invitation));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CooperationResponse> activeCooperations(Long userId) {
+        return cooperationRepository
+                .findByParticipantAndStatus(userId, CooperationStatus.ACTIVE).stream()
+                .map(cooperation -> toResponse(cooperation, userId))
+                .toList();
+    }
+
+    @Override
+    public void end(Long userId, Long cooperationId) {
+        Cooperation cooperation = cooperationRepository.findById(cooperationId)
+                .orElseThrow(() -> new CooperationNotFoundException(cooperationId));
+
+        boolean isCoach = cooperation.getCoach().getId().equals(userId);
+        boolean isAthlete = cooperation.getAthlete().getId().equals(userId);
+
+        if (!isCoach && !isAthlete) {
+            throw new AccessDeniedException(NOT_PARTICIPANT_MESSAGE);
+        }
+
+        if (cooperation.getStatus() != CooperationStatus.ACTIVE) {
+            throw new CooperationConflictException(NOT_ACTIVE_MESSAGE);
+        }
+
+        cooperation.setStatus(CooperationStatus.ENDED);
+        cooperation.setEndedAt(LocalDateTime.now());
+        cooperationRepository.save(cooperation);
+
+        log.info("Użytkownik {} zakończył współpracę id={}", userId, cooperationId);
+
+        notifyOtherParty(cooperation, isCoach);
+    }
+
+    private static CooperationResponse toResponse(Cooperation cooperation, Long userId) {
+        boolean askingAsCoach = cooperation.getCoach().getId().equals(userId);
+        User partner = askingAsCoach ? cooperation.getAthlete() : cooperation.getCoach();
+
+        return new CooperationResponse(
+                cooperation.getId(),
+                askingAsCoach ? CooperationRole.COACH : CooperationRole.ATHLETE,
+                partner.getId(),
+                partner.getFirstName(),
+                partner.getLastName(),
+                partner.getEmail(),
+                cooperation.getRespondedAt());
+    }
+
+    private void notifyOtherParty(Cooperation cooperation, boolean endedByCoach) {
+        User initiator = endedByCoach ? cooperation.getCoach() : cooperation.getAthlete();
+        User recipient = endedByCoach ? cooperation.getAthlete() : cooperation.getCoach();
+
+        try {
+            emailService.sendCooperationEnded(recipient.getEmail(), fullName(initiator));
+
+        } catch (RuntimeException ex) {
+            log.error("Nie udało się powiadomić o zakończeniu współpracy (id={}): {}",
+                    cooperation.getId(), ex.getMessage(), ex);
+        }
     }
 
     private void requirePairIsFree(Long coachId, Long athleteId) {

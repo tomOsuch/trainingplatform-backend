@@ -66,6 +66,18 @@ public class LoggingEmailService implements EmailService {
                 recipientEmail, coachName, invitationsUrl, EXPIRY_FORMAT.format(expiresAt));
     }
 
+    @Override
+    public void sendCooperationEnded(String recipientEmail, String initiatorName) {
+        log.info("""
+                        
+                        ─────────── KONIEC WSPÓŁPRACY — tryb lokalny, mail NIE został wysłany ───────────
+                          Do:        {}
+                          Zakończył: {}
+                        ─────────────────────────────────────────────────────────────────────────────────
+                        """,
+                recipientEmail, initiatorName);
+    }
+
     private void logMail(String kind, String recipient, String url, LocalDateTime expiresAt) {
         log.info("""
                         

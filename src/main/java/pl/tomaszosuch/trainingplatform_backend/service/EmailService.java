@@ -15,4 +15,6 @@ public interface EmailService {
 
     void sendCooperationInvitation(String recipientEmail, String coachName,
                                    String invitationsUrl, LocalDateTime expiresAt);
+
+    void sendCooperationEnded(String recipientEmail, String initiatorName);
 }

@@ -25,4 +25,16 @@ public interface CooperationRepository extends JpaRepository<Cooperation, Long> 
     boolean existsByCoachIdAndAthleteIdAndStatus(Long coachId, Long athleteId, CooperationStatus status);
 
     Optional<Cooperation> findByCoachIdAndAthleteIdAndStatusIn(Long coachId, Long athleteId, Collection<CooperationStatus> statuses);
+
+
+    @Query("""
+            SELECT c FROM Cooperation c
+            JOIN FETCH c.coach
+            JOIN FETCH c.athlete
+            WHERE (c.coach.id = :userId OR c.athlete.id = :userId)
+              AND c.status = :status
+            ORDER BY c.respondedAt DESC
+            """)
+    List<Cooperation> findByParticipantAndStatus(@Param("userId") Long userId,
+                                                 @Param("status") CooperationStatus status);
 }

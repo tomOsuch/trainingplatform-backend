@@ -151,6 +151,25 @@ public class SmtpEmailService implements EmailService {
                         """.formatted(coachName, invitationsUrl, expiry));
     }
 
+    @Override
+    public void sendCooperationEnded(String recipientEmail, String initiatorName) {
+        send(recipientEmail,
+                "Koniec współpracy — Platforma Treningowa",
+                "mail/cooperation-ended",
+                Map.of("initiatorName", initiatorName),
+                """
+                        Cześć,
+                        
+                        %s zakończył(a) Waszą współpracę trenerską w Platformie Treningowej.
+                        
+                        Wszystkie Twoje dane zostają na miejscu — plany, dziennik, cele i
+                        statystyki są nietknięte. Zmienia się tylko to, że druga strona
+                        nie ma już do nich dostępu.
+                        
+                        Współpracę można nawiązać ponownie w każdej chwili.
+                        """.formatted(initiatorName));
+    }
+
     private void send(String recipient, String subject, String template,
                       Map<String, Object> variables, String plainText) {
         try {

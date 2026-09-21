@@ -22,8 +22,10 @@ import org.springframework.security.access.AccessDeniedException;
 import pl.tomaszosuch.trainingplatform_backend.config.CooperationProperties;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.CooperationInviteRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.InvitationDecisionRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.CooperationResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.Cooperation;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
+import pl.tomaszosuch.trainingplatform_backend.enums.CooperationRole;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.InvitationDecision;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
@@ -278,5 +280,79 @@ class CooperationServiceImplTest {
                 service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL)).status());
 
         verify(cooperationRepository).save(any(Cooperation.class));
+    }
+
+
+    @Test
+    @DisplayName("trener może zakończyć współpracę")
+    void shouldAllowCoachToEnd() {
+        Cooperation active = invitation(CooperationStatus.ACTIVE, null);
+        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(active));
+
+        service.end(COACH_ID, 10L);
+
+        assertEquals(CooperationStatus.ENDED, active.getStatus());
+        assertTrue(active.getEndedAt() != null);
+        verify(emailService).sendCooperationEnded(eq(ATHLETE_EMAIL), any());
+    }
+
+    @Test
+    @DisplayName("podopieczny może zakończyć współpracę")
+    void shouldAllowAthleteToEnd() {
+        Cooperation active = invitation(CooperationStatus.ACTIVE, null);
+        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(active));
+
+        service.end(ATHLETE_ID, 10L);
+
+        assertEquals(CooperationStatus.ENDED, active.getStatus());
+        // Powiadomienie leci do trenera, czyli do drugiej strony niż przy poprzednim teście.
+        verify(emailService).sendCooperationEnded(eq("trener@example.com"), any());
+    }
+
+    @Test
+    @DisplayName("osoba spoza relacji nie może jej zakończyć")
+    void shouldRejectEndByOutsider() {
+        Cooperation active = invitation(CooperationStatus.ACTIVE, null);
+        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(active));
+
+        assertThrows(AccessDeniedException.class, () -> service.end(99L, 10L));
+
+        assertEquals(CooperationStatus.ACTIVE, active.getStatus());
+        verify(cooperationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("nieaktywnej współpracy nie da się zakończyć drugi raz")
+    void shouldRejectEndWhenNotActive() {
+        Cooperation ended = invitation(CooperationStatus.ENDED, null);
+        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(ended));
+
+        assertThrows(CooperationConflictException.class, () -> service.end(COACH_ID, 10L));
+
+        verify(cooperationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("lista pokazuje, po której stronie relacji stoi pytający")
+    void shouldTellWhichSideTheCallerIsOn() {
+        when(cooperationRepository.findByParticipantAndStatus(COACH_ID, CooperationStatus.ACTIVE))
+                .thenReturn(List.of(invitation(CooperationStatus.ACTIVE, null)));
+
+        CooperationResponse response = service.activeCooperations(COACH_ID).get(0);
+
+        assertEquals(CooperationRole.COACH, response.role());
+        assertEquals(ATHLETE_ID, response.partnerId());
+    }
+
+    @Test
+    @DisplayName("ta sama relacja widziana z drugiej strony ma odwrotną rolę i partnera")
+    void shouldFlipRoleForTheOtherSide() {
+        when(cooperationRepository.findByParticipantAndStatus(ATHLETE_ID, CooperationStatus.ACTIVE))
+                .thenReturn(List.of(invitation(CooperationStatus.ACTIVE, null)));
+
+        CooperationResponse response = service.activeCooperations(ATHLETE_ID).get(0);
+
+        assertEquals(CooperationRole.ATHLETE, response.role());
+        assertEquals(COACH_ID, response.partnerId());
     }
 }

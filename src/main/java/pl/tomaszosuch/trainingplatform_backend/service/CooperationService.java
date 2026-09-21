@@ -5,6 +5,7 @@ import java.util.List;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.CooperationInviteRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.InvitationDecisionRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.CooperationInvitationResponse;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.CooperationResponse;
 
 public interface CooperationService {
 
@@ -13,4 +14,8 @@ public interface CooperationService {
     List<CooperationInvitationResponse> receivedInvitations(Long athleteId);
 
     CooperationInvitationResponse respond(Long athleteId, Long invitationId, InvitationDecisionRequest request);
+
+    List<CooperationResponse> activeCooperations(Long userId);
+
+    void end(Long userId, Long cooperationId);
 }
