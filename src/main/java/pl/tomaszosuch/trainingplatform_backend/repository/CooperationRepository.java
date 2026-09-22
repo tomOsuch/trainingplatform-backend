@@ -1,6 +1,8 @@
 package pl.tomaszosuch.trainingplatform_backend.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -22,6 +24,9 @@ public interface CooperationRepository extends JpaRepository<Cooperation, Long> 
 
     Optional<Cooperation> findByCoachIdAndAthleteIdAndStatusIn(Long coachId, Long athleteId, Collection<CooperationStatus> statuses);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Cooperation c WHERE c.id = :id")
+    Optional<Cooperation> lockById(@Param("id") Long id);
 
     @Query("""
             SELECT c FROM Cooperation c

@@ -186,7 +186,7 @@ class CooperationServiceImplTest {
     @DisplayName("akceptacja przestawia współpracę na aktywną")
     void shouldActivateOnAccept() {
         Cooperation pending = invitation(CooperationStatus.PENDING, LocalDateTime.now().plusDays(7));
-        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(pending));
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(pending));
         when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.respond(ATHLETE_ID, 10L, new InvitationDecisionRequest(InvitationDecision.ACCEPTED));
@@ -199,7 +199,7 @@ class CooperationServiceImplTest {
     @DisplayName("odrzucone zaproszenie nie daje się odrzucić ponownie")
     void shouldRejectSecondDecision() {
         Cooperation resolved = invitation(CooperationStatus.REJECTED, LocalDateTime.now().plusDays(7));
-        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(resolved));
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(resolved));
 
         assertThrows(CooperationConflictException.class,
                 () -> service.respond(ATHLETE_ID, 10L,
@@ -212,7 +212,7 @@ class CooperationServiceImplTest {
     @DisplayName("przeterminowanego zaproszenia nie da się zaakceptować")
     void shouldRejectExpiredInvitation() {
         Cooperation stale = invitation(CooperationStatus.PENDING, LocalDateTime.now().minusMinutes(1));
-        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(stale));
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(stale));
 
         assertThrows(CooperationConflictException.class,
                 () -> service.respond(ATHLETE_ID, 10L,
@@ -226,7 +226,7 @@ class CooperationServiceImplTest {
     @DisplayName("odpowiedzieć może wyłącznie adresat")
     void shouldRejectResponseFromSomeoneElse() {
         Cooperation pending = invitation(CooperationStatus.PENDING, LocalDateTime.now().plusDays(7));
-        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(pending));
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(pending));
 
         assertThrows(AccessDeniedException.class,
                 () -> service.respond(COACH_ID, 10L,
@@ -236,7 +236,7 @@ class CooperationServiceImplTest {
     @Test
     @DisplayName("nieistniejące zaproszenie daje 404")
     void shouldThrowWhenInvitationMissing() {
-        when(cooperationRepository.findById(99L)).thenReturn(Optional.empty());
+        when(cooperationRepository.lockById(99L)).thenReturn(Optional.empty());
 
         assertThrows(CooperationNotFoundException.class,
                 () -> service.respond(ATHLETE_ID, 99L,
@@ -290,7 +290,7 @@ class CooperationServiceImplTest {
     @DisplayName("trener może zakończyć współpracę")
     void shouldAllowCoachToEnd() {
         Cooperation active = invitation(CooperationStatus.ACTIVE, null);
-        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(active));
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(active));
 
         service.end(COACH_ID, 10L);
 
@@ -303,7 +303,7 @@ class CooperationServiceImplTest {
     @DisplayName("podopieczny może zakończyć współpracę")
     void shouldAllowAthleteToEnd() {
         Cooperation active = invitation(CooperationStatus.ACTIVE, null);
-        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(active));
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(active));
 
         service.end(ATHLETE_ID, 10L);
 
@@ -315,7 +315,7 @@ class CooperationServiceImplTest {
     @DisplayName("osoba spoza relacji nie może jej zakończyć")
     void shouldRejectEndByOutsider() {
         Cooperation active = invitation(CooperationStatus.ACTIVE, null);
-        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(active));
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(active));
 
         assertThrows(AccessDeniedException.class, () -> service.end(99L, 10L));
 
@@ -327,7 +327,7 @@ class CooperationServiceImplTest {
     @DisplayName("nieaktywnej współpracy nie da się zakończyć drugi raz")
     void shouldRejectEndWhenNotActive() {
         Cooperation ended = invitation(CooperationStatus.ENDED, null);
-        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(ended));
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(ended));
 
         assertThrows(CooperationConflictException.class, () -> service.end(COACH_ID, 10L));
 
@@ -362,7 +362,7 @@ class CooperationServiceImplTest {
     @DisplayName("trener wycofuje własne zaproszenie")
     void shouldWithdrawOwnInvitation() {
         Cooperation pending = invitation(CooperationStatus.PENDING, LocalDateTime.now().plusDays(7));
-        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(pending));
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(pending));
 
         service.withdraw(COACH_ID, 10L);
 
@@ -374,7 +374,7 @@ class CooperationServiceImplTest {
     @Test
     @DisplayName("adresat nie wycofa cudzego zaproszenia - ma własną drogę przez odmowę")
     void shouldRejectWithdrawByAddressee() {
-        when(cooperationRepository.findById(10L))
+        when(cooperationRepository.lockById(10L))
                 .thenReturn(Optional.of(invitation(CooperationStatus.PENDING, LocalDateTime.now().plusDays(7))));
 
         assertThrows(AccessDeniedException.class, () -> service.withdraw(ATHLETE_ID, 10L));
@@ -385,7 +385,7 @@ class CooperationServiceImplTest {
     @Test
     @DisplayName("zaproszenie już rozstrzygnięte: 409")
     void shouldRejectWithdrawOfResolvedInvitation() {
-        when(cooperationRepository.findById(10L))
+        when(cooperationRepository.lockById(10L))
                 .thenReturn(Optional.of(invitation(CooperationStatus.ACTIVE, null)));
 
         assertThrows(CooperationConflictException.class, () -> service.withdraw(COACH_ID, 10L));
@@ -397,7 +397,7 @@ class CooperationServiceImplTest {
     @DisplayName("przeterminowane zaproszenie da się wycofać - inaczej zostałoby nie do ruszenia")
     void shouldAllowWithdrawOfExpiredInvitation() {
         Cooperation stale = invitation(CooperationStatus.PENDING, LocalDateTime.now().minusDays(1));
-        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(stale));
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(stale));
 
         service.withdraw(COACH_ID, 10L);
 
@@ -418,5 +418,17 @@ class CooperationServiceImplTest {
         assertEquals(ATHLETE_ID, forCoach.partnerId());
         assertEquals(CooperationRole.ATHLETE, forAthlete.role());
         assertEquals(COACH_ID, forAthlete.partnerId());
+    }
+
+    @Test
+    @DisplayName("przejścia stanu czytają wiersz pod blokadą, nie zwykłym findById")
+    void shouldReadUnderLock() {
+        Cooperation pending = invitation(CooperationStatus.PENDING, LocalDateTime.now().plusDays(7));
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(pending));
+
+        service.withdraw(COACH_ID, 10L);
+
+        verify(cooperationRepository).lockById(10L);
+        verify(cooperationRepository, never()).findById(anyLong());
     }
 }

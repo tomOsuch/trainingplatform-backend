@@ -98,7 +98,7 @@ public class CooperationServiceImpl implements CooperationService {
     @Override
     public CooperationInvitationResponse respond(Long athleteId, Long invitationId, InvitationDecisionRequest request) {
 
-        Cooperation invitation = cooperationRepository.findById(invitationId)
+        Cooperation invitation = cooperationRepository.lockById(invitationId)
                 .orElseThrow(() -> new CooperationNotFoundException(invitationId));
 
         if (!invitation.getAthlete().getId().equals(athleteId)) {
@@ -151,7 +151,7 @@ public class CooperationServiceImpl implements CooperationService {
 
     @Override
     public void end(Long userId, Long cooperationId) {
-        Cooperation cooperation = cooperationRepository.findById(cooperationId)
+        Cooperation cooperation = cooperationRepository.lockById(cooperationId)
                 .orElseThrow(() -> new CooperationNotFoundException(cooperationId));
 
         boolean isCoach = cooperation.getCoach().getId().equals(userId);
@@ -177,7 +177,7 @@ public class CooperationServiceImpl implements CooperationService {
     @Override
     public void withdraw(Long coachId, Long invitationId) {
 
-        Cooperation invitation = cooperationRepository.findById(invitationId)
+        Cooperation invitation = cooperationRepository.lockById(invitationId)
                 .orElseThrow(() -> new CooperationNotFoundException(invitationId));
 
         if (!invitation.getCoach().getId().equals(coachId)) {
