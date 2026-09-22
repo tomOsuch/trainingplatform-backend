@@ -62,24 +62,21 @@ public class CooperationServiceImpl implements CooperationService {
 
         String email = request.email().trim();
 
-        Optional<User> found = userRepository.findByEmail(email).filter(User::getIsActive);
+        User athlete = userRepository.findByEmail(email)
+                .filter(User::getIsActive)
+                .orElseThrow(() -> new UserNotFoundException(email));
 
-        if (found.isEmpty()) {
-            rateLimiter.registerCooperationInvitationMiss(coachId);
-            throw new UserNotFoundException(email);
-        }
-
-        User athlete = found.get();
+        rateLimiter.refundCooperationInvitationMiss(coachId);
 
         if (athlete.getId().equals(coachId)) {
             throw new IllegalArgumentException(SELF_INVITE_MESSAGE);
         }
 
+        User coach = userRepository.lockById(coachId)
+                .orElseThrow(() -> new UserNotFoundException(coachId));
+
         requirePairIsFree(coachId, athlete.getId());
         requireRoomForAnotherInvitation(coachId);
-
-        User coach = userRepository.findById(coachId)
-                .orElseThrow(() -> new UserNotFoundException(coachId));
 
         Cooperation invitation = cooperationRepository.save(Cooperation.builder()
                 .coach(coach)

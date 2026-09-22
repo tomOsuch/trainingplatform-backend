@@ -74,8 +74,6 @@ class CooperationServiceImplTest {
         CooperationProperties properties = new CooperationProperties();
         properties.setInvitationExpirationDays(14);
         properties.setInvitationsUrl("http://localhost:3000/wspolpraca/zaproszenia");
-        // Konieczne, nie kosmetyczne: bez tego pole ma wartość 0, warunek 0 >= 0 jest
-        // prawdziwy i każde zaproszenie w tym pliku padłoby na limicie oczekujących.
         properties.setMaxPendingInvitations(20);
 
         service = new CooperationServiceImpl(cooperationRepository, userRepository,
@@ -106,7 +104,7 @@ class CooperationServiceImplTest {
     @DisplayName("zaproszenie dostaje termin ważności z konfiguracji")
     void shouldSetExpiryFromProperties() {
         when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
-        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
         givenPairIsFree();
         when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -159,6 +157,7 @@ class CooperationServiceImplTest {
     @DisplayName("trwająca współpraca blokuje kolejne zaproszenie")
     void shouldRejectInviteWhenCooperationActive() {
         when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
         when(cooperationRepository.findByCoachIdAndAthleteIdAndStatusIn(any(), any(), any()))
                 .thenReturn(Optional.of(invitation(CooperationStatus.ACTIVE, null)));
 
@@ -175,7 +174,7 @@ class CooperationServiceImplTest {
         Cooperation stale = invitation(CooperationStatus.PENDING, LocalDateTime.now().minusDays(1));
 
         when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
-        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
         when(cooperationRepository.findByCoachIdAndAthleteIdAndStatusIn(any(), any(), any()))
                 .thenReturn(Optional.of(stale));
         when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -263,7 +262,7 @@ class CooperationServiceImplTest {
     @DisplayName("zaproszenie idzie mailem do adresata, z nazwiskiem zapraszającego")
     void shouldSendInvitationEmail() {
         when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
-        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
         givenPairIsFree();
         when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -278,7 +277,7 @@ class CooperationServiceImplTest {
     @DisplayName("niedostępna poczta nie kasuje zaproszenia")
     void shouldKeepInvitationWhenDeliveryFails() {
         when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
-        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
         givenPairIsFree();
         when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
         doThrow(new RuntimeException("Dostawca niedostępny"))
@@ -437,17 +436,15 @@ class CooperationServiceImplTest {
         verify(cooperationRepository, never()).findById(anyLong());
     }
 
-    // --- I8: limity zaproszeń ---
-
     @Test
-    @DisplayName("adres bez konta: 404 i kara w kubełku chybień")
-    void shouldRegisterMissForUnknownEmail() {
+    @DisplayName("adres bez konta: 404, token chybienia NIE wraca")
+    void shouldKeepMissTokenForUnknownEmail() {
         when(userRepository.findByEmail("nikt@example.com")).thenReturn(Optional.empty());
 
         assertThrows(UserNotFoundException.class,
                 () -> service.invite(COACH_ID, new CooperationInviteRequest("nikt@example.com")));
 
-        verify(rateLimiter).registerCooperationInvitationMiss(COACH_ID);
+        verify(rateLimiter, never()).refundCooperationInvitationMiss(any());
         verify(cooperationRepository, never()).save(any());
     }
 
@@ -460,20 +457,20 @@ class CooperationServiceImplTest {
         assertThrows(UserNotFoundException.class,
                 () -> service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL)));
 
-        verify(rateLimiter).registerCooperationInvitationMiss(COACH_ID);
+        verify(rateLimiter, never()).refundCooperationInvitationMiss(any());
     }
 
     @Test
-    @DisplayName("trafione zaproszenie nie karze kubełka chybień")
-    void shouldNotRegisterMissOnHit() {
+    @DisplayName("trafienie oddaje token chybienia")
+    void shouldRefundMissTokenOnHit() {
         when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
-        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
         givenPairIsFree();
         when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL));
 
-        verify(rateLimiter, never()).registerCooperationInvitationMiss(any());
+        verify(rateLimiter).refundCooperationInvitationMiss(COACH_ID);
     }
 
     @Test
@@ -492,6 +489,7 @@ class CooperationServiceImplTest {
     @DisplayName("pełna pula oczekujących: 409, bez zapisu i bez maila")
     void shouldRejectWhenPendingLimitReached() {
         when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
         givenPairIsFree();
         when(cooperationRepository.countByCoachIdAndStatusAndExpiresAtAfter(
                 eq(COACH_ID), eq(CooperationStatus.PENDING), any())).thenReturn(20L);
