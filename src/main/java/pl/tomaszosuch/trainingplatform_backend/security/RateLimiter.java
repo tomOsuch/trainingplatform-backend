@@ -15,8 +15,6 @@ import pl.tomaszosuch.trainingplatform_backend.exception.RateLimitExceededExcept
 import java.time.Duration;
 import java.util.Locale;
 
-import static org.hibernate.boot.cfgxml.spi.MappingReference.consume;
-
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -39,8 +37,8 @@ public class RateLimiter {
             return;
         }
 
-        consume(kluczIp("login", ip), properties.getLoginPerIp(), properties.getLoginWindow());
-        assertAvailable(kluczEmail("login", email),
+        consume(keyIp("login", ip), properties.getLoginPerIp(), properties.getLoginWindow());
+        assertAvailable(keyEmail("login", email),
                 properties.getLoginPerAccount(), properties.getLoginWindow());
     }
 
@@ -49,7 +47,7 @@ public class RateLimiter {
             return;
         }
 
-        penalize(kluczEmail("login", email),
+        penalize(keyEmail("login", email),
                 properties.getLoginPerAccount(), properties.getLoginWindow());
     }
 
@@ -58,9 +56,9 @@ public class RateLimiter {
             return;
         }
 
-        consume(kluczIp("reset", ip),
+        consume(keyIp("reset", ip),
                 properties.getPasswordResetPerIp(), properties.getPasswordResetWindow());
-        consume(kluczEmail("reset", email),
+        consume(keyEmail("reset", email),
                 properties.getPasswordResetPerEmail(), properties.getPasswordResetWindow());
     }
 
@@ -73,31 +71,63 @@ public class RateLimiter {
                 properties.getInvitationPerAdmin(), properties.getInvitationWindow());
     }
 
+    public void checkCooperationInvitation(Long userId) {
+        if (!properties.isEnabled()) {
+            return;
+        }
+
+        consume(integrationKey("wszystkie", userId),
+                properties.getCooperationInvitationPerUser(),
+                properties.getCooperationInvitationWindow());
+
+        consume(integrationKey("chybienia", userId),
+                properties.getCooperationInvitationMissesPerUser(),
+                properties.getCooperationInvitationWindow());
+    }
+
+    public void refundCooperationInvitationMiss(Long userId) {
+        if (!properties.isEnabled()) {
+            return;
+        }
+
+        refund(integrationKey("chybienia", userId),
+                properties.getCooperationInvitationMissesPerUser(),
+                properties.getCooperationInvitationWindow());
+    }
+
     private void consume(String klucz, int limit, Duration okno) {
-        ConsumptionProbe probe = kubelek(klucz, limit, okno).tryConsumeAndReturnRemaining(1);
+        ConsumptionProbe probe = bucket(klucz, limit, okno).tryConsumeAndReturnRemaining(1);
 
         if (!probe.isConsumed()) {
-            long sekundy = naSekundy(probe.getNanosToWaitForRefill());
+            long sekundy = forSeconds(probe.getNanosToWaitForRefill());
             log.warn("Przekroczono limit dla klucza {} — ponowna próba za {} s", klucz, sekundy);
             throw new RateLimitExceededException(sekundy);
         }
     }
 
     private void assertAvailable(String klucz, int limit, Duration okno) {
-        EstimationProbe probe = kubelek(klucz, limit, okno).estimateAbilityToConsume(1);
+        EstimationProbe probe = bucket(klucz, limit, okno).estimateAbilityToConsume(1);
 
         if (!probe.canBeConsumed()) {
-            long sekundy = naSekundy(probe.getNanosToWaitForRefill());
+            long sekundy = forSeconds(probe.getNanosToWaitForRefill());
             log.warn("Klucz {} jest wyczerpany — ponowna próba za {} s", klucz, sekundy);
             throw new RateLimitExceededException(sekundy);
         }
     }
 
-    private void penalize(String klucz, int limit, Duration okno) {
-        kubelek(klucz, limit, okno).tryConsume(1);
+    private String integrationKey(String type, Long userId) {
+        return "wspolpraca:" + type + ":uzytkownik:" + userId;
     }
 
-    private Bucket kubelek(String klucz, int limit, Duration okno) {
+    private void penalize(String klucz, int limit, Duration okno) {
+        bucket(klucz, limit, okno).tryConsume(1);
+    }
+
+    private void refund(String klucz, int limit, Duration okno) {
+        bucket(klucz, limit, okno).addTokens(1);
+    }
+
+    private Bucket bucket(String klucz, int limit, Duration okno) {
         return kubelki.get(klucz, nowy -> Bucket.builder()
                 .addLimit(Bandwidth.builder()
                         .capacity(limit)
@@ -106,18 +136,18 @@ public class RateLimiter {
                 .build());
     }
 
-    private String kluczIp(String obszar, String ip) {
+    private String keyIp(String obszar, String ip) {
         return obszar + ":ip:" + (ip == null || ip.isBlank() ? NIEZNANY : ip);
     }
 
-    private String kluczEmail(String obszar, String email) {
+    private String keyEmail(String obszar, String email) {
         if (email == null || email.isBlank()) {
             return obszar + ":email:" + NIEZNANY;
         }
         return obszar + ":email:" + email.trim().toLowerCase(Locale.ROOT);
     }
 
-    private long naSekundy(long nanosekundy) {
+    private long forSeconds(long nanosekundy) {
         return Math.max(1, (nanosekundy + 999_999_999L) / 1_000_000_000L);
     }
 

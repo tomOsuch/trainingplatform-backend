@@ -60,6 +60,7 @@ app:
   cooperation:
     invitation-expiration-days: ${COOPERATION_INVITATION_EXPIRATION_DAYS:14}
     invitations-url: ${COOPERATION_INVITATIONS_URL:http://localhost:3000/wspolpraca/zaproszenia}
+    max-pending-invitations: ${COOPERATION_MAX_PENDING_INVITATIONS:20}
   password-reset:
     expiration-minutes: ${PASSWORD_RESET_EXPIRATION_MINUTES:60}
     reset-base-url: ${PASSWORD_RESET_BASE_URL:http://localhost:3000/reset-password}
@@ -79,6 +80,9 @@ app:
     password-reset-window: ${RATE_LIMIT_RESET_WINDOW:60m}
     invitation-per-admin: ${RATE_LIMIT_INVITATION_PER_ADMIN:20}
     invitation-window: ${RATE_LIMIT_INVITATION_WINDOW:60m}
+    cooperation-invitation-per-user: ${RATE_LIMIT_COOPERATION_INVITATION_PER_USER:20}
+    cooperation-invitation-misses-per-user: ${RATE_LIMIT_COOPERATION_INVITATION_MISSES_PER_USER:5}
+    cooperation-invitation-window: ${RATE_LIMIT_COOPERATION_INVITATION_WINDOW:60m}
   reminders:
     enabled: ${REMINDERS_ENABLED:true}
     cron: ${REMINDERS_CRON:0 0 * * * *}

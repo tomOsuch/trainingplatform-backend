@@ -40,4 +40,13 @@ public class RateLimitProperties {
 
     @NotNull
     private Duration invitationWindow;
+
+    @Positive
+    private int cooperationInvitationPerUser;
+
+    @Positive
+    private int cooperationInvitationMissesPerUser;
+
+    @NotNull
+    private Duration cooperationInvitationWindow;
 }

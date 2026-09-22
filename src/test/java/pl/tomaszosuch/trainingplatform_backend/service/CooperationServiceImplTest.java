@@ -1,9 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.service;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -21,6 +18,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 import pl.tomaszosuch.trainingplatform_backend.config.CooperationProperties;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.CooperationInviteRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.InvitationDecisionRequest;
@@ -34,11 +33,11 @@ import pl.tomaszosuch.trainingplatform_backend.enums.InvitationDecision;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationConflictException;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationNotFoundException;
+import pl.tomaszosuch.trainingplatform_backend.exception.RateLimitExceededException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
-import pl.tomaszosuch.trainingplatform_backend.mapper.CooperationMapper;
-import pl.tomaszosuch.trainingplatform_backend.mapper.CooperationMapperImpl;
 import pl.tomaszosuch.trainingplatform_backend.repository.CooperationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.RateLimiter;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.CooperationServiceImpl;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,6 +57,9 @@ class CooperationServiceImplTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private RateLimiter rateLimiter;
+
     private CooperationServiceImpl service;
 
     private User coach;
@@ -71,10 +73,10 @@ class CooperationServiceImplTest {
         CooperationProperties properties = new CooperationProperties();
         properties.setInvitationExpirationDays(14);
         properties.setInvitationsUrl("http://localhost:3000/wspolpraca/zaproszenia");
+        properties.setMaxPendingInvitations(20);
 
-        CooperationMapper mapper = new CooperationMapperImpl();
         service = new CooperationServiceImpl(cooperationRepository, userRepository,
-                properties, emailService);
+                properties, emailService, rateLimiter);
     }
 
     private static User user(Long id, String email) {
@@ -101,7 +103,7 @@ class CooperationServiceImplTest {
     @DisplayName("zaproszenie dostaje termin ważności z konfiguracji")
     void shouldSetExpiryFromProperties() {
         when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
-        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
         givenPairIsFree();
         when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -154,6 +156,7 @@ class CooperationServiceImplTest {
     @DisplayName("trwająca współpraca blokuje kolejne zaproszenie")
     void shouldRejectInviteWhenCooperationActive() {
         when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
         when(cooperationRepository.findByCoachIdAndAthleteIdAndStatusIn(any(), any(), any()))
                 .thenReturn(Optional.of(invitation(CooperationStatus.ACTIVE, null)));
 
@@ -170,7 +173,7 @@ class CooperationServiceImplTest {
         Cooperation stale = invitation(CooperationStatus.PENDING, LocalDateTime.now().minusDays(1));
 
         when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
-        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
         when(cooperationRepository.findByCoachIdAndAthleteIdAndStatusIn(any(), any(), any()))
                 .thenReturn(Optional.of(stale));
         when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -258,7 +261,7 @@ class CooperationServiceImplTest {
     @DisplayName("zaproszenie idzie mailem do adresata, z nazwiskiem zapraszającego")
     void shouldSendInvitationEmail() {
         when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
-        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
         givenPairIsFree();
         when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -273,7 +276,7 @@ class CooperationServiceImplTest {
     @DisplayName("niedostępna poczta nie kasuje zaproszenia")
     void shouldKeepInvitationWhenDeliveryFails() {
         when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
-        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
         givenPairIsFree();
         when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
         doThrow(new RuntimeException("Dostawca niedostępny"))
@@ -431,4 +434,135 @@ class CooperationServiceImplTest {
         verify(cooperationRepository).lockById(10L);
         verify(cooperationRepository, never()).findById(anyLong());
     }
+
+    @Test
+    @DisplayName("adres bez konta: 404, token chybienia NIE wraca")
+    void shouldKeepMissTokenForUnknownEmail() {
+        when(userRepository.findByEmail("nikt@example.com")).thenReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class,
+                () -> service.invite(COACH_ID, new CooperationInviteRequest("nikt@example.com")));
+
+        verify(rateLimiter, never()).refundCooperationInvitationMiss(any());
+        verify(cooperationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("konto wyłączone liczy się jak brak konta - nie wolno ich rozróżnić")
+    void shouldTreatInactiveAccountAsMiss() {
+        athlete.setIsActive(false);
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+
+        assertThrows(UserNotFoundException.class,
+                () -> service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL)));
+
+        verify(rateLimiter, never()).refundCooperationInvitationMiss(any());
+    }
+
+    @Test
+    @DisplayName("trafienie oddaje token chybienia")
+    void shouldRefundMissTokenOnHit() {
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
+        givenPairIsFree();
+        when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL));
+
+        verify(rateLimiter).refundCooperationInvitationMiss(COACH_ID);
+    }
+
+    @Test
+    @DisplayName("przekroczony limit zatrzymuje żądanie przed pierwszym zapytaniem do bazy")
+    void shouldStopBeforeLookupWhenLimited() {
+        doThrow(new RateLimitExceededException(60))
+                .when(rateLimiter).checkCooperationInvitation(COACH_ID);
+
+        assertThrows(RateLimitExceededException.class,
+                () -> service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL)));
+
+        verify(userRepository, never()).findByEmail(any());
+    }
+
+    @Test
+    @DisplayName("pełna pula oczekujących: 409, bez zapisu i bez maila")
+    void shouldRejectWhenPendingLimitReached() {
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
+        givenPairIsFree();
+        when(cooperationRepository.countByCoachIdAndStatusAndExpiresAtAfter(
+                eq(COACH_ID), eq(CooperationStatus.PENDING), any())).thenReturn(20L);
+
+        CooperationConflictException ex = assertThrows(CooperationConflictException.class,
+                () -> service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL)));
+
+        assertTrue(ex.getMessage().contains("20"));
+        verify(cooperationRepository, never()).save(any());
+        verify(emailService, never()).sendCooperationInvitation(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("w transakcji mail z zaproszeniem czeka na commit - nie wychodzi pod blokadą")
+    void shouldSendInvitationOnlyAfterCommit() {
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
+        givenPairIsFree();
+        when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL));
+
+            verify(emailService, never()).sendCooperationInvitation(any(), any(), any(), any());
+
+            TransactionSynchronizationUtils.triggerAfterCommit();
+
+            verify(emailService).sendCooperationInvitation(
+                    eq(ATHLETE_EMAIL), eq("Jan Testowy"),
+                    eq("http://localhost:3000/wspolpraca/zaproszenia"), any());
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("powiadomienie o zakończeniu też czeka na commit")
+    void shouldNotifyEndOnlyAfterCommit() {
+        Cooperation active = invitation(CooperationStatus.ACTIVE, null);
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(active));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.end(COACH_ID, 10L);
+
+            verify(emailService, never()).sendCooperationEnded(any(), any());
+
+            TransactionSynchronizationUtils.triggerAfterCommit();
+
+            verify(emailService).sendCooperationEnded(eq(ATHLETE_EMAIL), eq("Jan Testowy"));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("awaria poczty po commicie nie zamienia zapisanego zaproszenia w błąd")
+    void shouldSwallowMailFailureAfterCommit() {
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
+        givenPairIsFree();
+        when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
+        doThrow(new RuntimeException("Dostawca niedostępny"))
+                .when(emailService).sendCooperationInvitation(any(), any(), any(), any());
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL));
+
+            assertDoesNotThrow(TransactionSynchronizationUtils::triggerAfterCommit);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
 }

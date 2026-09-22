@@ -1,10 +1,15 @@
 package pl.tomaszosuch.trainingplatform_backend.security;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,10 +41,10 @@ public class RateLimiterTest {
         properties.setPasswordResetWindow(Duration.ofMinutes(60));
         properties.setInvitationPerAdmin(2);
         properties.setInvitationWindow(Duration.ofMinutes(60));
+        properties.setCooperationInvitationPerUser(3);
+        properties.setCooperationInvitationMissesPerUser(2);
+        properties.setCooperationInvitationWindow(Duration.ofMinutes(60));
 
-        // Nowa instancja w każdym teście — kubełki żyją w polu, więc wspólny
-        // obiekt przenosiłby zużycie między przypadkami i wyniki zależałyby
-        // od kolejności wykonania.
         rateLimiter = new RateLimiter(properties);
     }
 
@@ -64,7 +69,6 @@ public class RateLimiterTest {
         RateLimitExceededException ex = assertThrows(RateLimitExceededException.class,
                 () -> rateLimiter.checkLoginAttempt(IP, EMAIL));
 
-        // Retry-After: 0 zachęcałby klienta do natychmiastowego ponowienia.
         assertTrue(ex.getRetryAfterSeconds() >= 1);
     }
 
@@ -81,9 +85,6 @@ public class RateLimiterTest {
     @Test
     @DisplayName("sama próba logowania NIE zużywa kubełka konta")
     void shouldNotConsumeAccountBucketOnAttempt() {
-        // Limit konta to 2, a mimo trzech prób konto pozostaje dostępne.
-        // Gdyby było inaczej, ktoś znający cudzy adres e-mail wykluczyłby
-        // właściciela z konta samymi próbami logowania.
         rateLimiter.checkLoginAttempt(IP, EMAIL);
         rateLimiter.checkLoginAttempt(IP, EMAIL);
         rateLimiter.checkLoginAttempt(IP, EMAIL);
@@ -97,8 +98,6 @@ public class RateLimiterTest {
         rateLimiter.registerFailedLogin(EMAIL);
         rateLimiter.registerFailedLogin(EMAIL);
 
-        // To jest powód, dla którego sam limit po IP nie wystarcza:
-        // atak z wielu adresów omijałby go w całości.
         assertThrows(RateLimitExceededException.class,
                 () -> rateLimiter.checkLoginAttempt(INNE_IP, EMAIL));
     }
@@ -126,8 +125,6 @@ public class RateLimiterTest {
         assertThrows(RateLimitExceededException.class,
                 () -> szybki.checkLoginAttempt(IP, EMAIL));
 
-        // Regeneracja jest płynna: przy 3 tokenach na 500 ms jeden wraca
-        // co ~167 ms. Czekamy 400 ms, więc margines jest ponad dwukrotny.
         Thread.sleep(400);
 
         assertDoesNotThrow(() -> szybki.checkLoginAttempt(IP, EMAIL));
@@ -152,8 +149,6 @@ public class RateLimiterTest {
         rateLimiter.checkPasswordResetRequest(IP, EMAIL);
         rateLimiter.checkPasswordResetRequest(INNE_IP, EMAIL);
 
-        // Limit po IP to 5, więc blokadę wywołuje wyłącznie kubełek adresu e-mail
-        // — to on chroni cudzą skrzynkę przed zasypaniem.
         assertThrows(RateLimitExceededException.class,
                 () -> rateLimiter.checkPasswordResetRequest(TRZECIE_IP, EMAIL));
     }
@@ -168,5 +163,70 @@ public class RateLimiterTest {
                 () -> rateLimiter.checkInvitationCreation(1L));
 
         assertDoesNotThrow(() -> rateLimiter.checkInvitationCreation(2L));
+    }
+
+    @Test
+    @DisplayName("zaproszenia do współpracy są limitowane per użytkownik")
+    void shouldLimitCooperationInvitationsPerUser() {
+        for (int i = 0; i < 3; i++) {
+            rateLimiter.checkCooperationInvitation(1L);
+            rateLimiter.refundCooperationInvitationMiss(1L);
+        }
+
+        assertThrows(RateLimitExceededException.class,
+                () -> rateLimiter.checkCooperationInvitation(1L));
+        assertDoesNotThrow(() -> rateLimiter.checkCooperationInvitation(2L));
+    }
+
+    @Test
+    @DisplayName("chybienia blokują wcześniej niż limit ogólny - to jest bariera przeciw enumeracji")
+    void shouldBlockAfterMissesEvenWithGeneralRoomLeft() {
+        rateLimiter.checkCooperationInvitation(1L);
+        rateLimiter.checkCooperationInvitation(1L);
+
+        assertThrows(RateLimitExceededException.class,
+                () -> rateLimiter.checkCooperationInvitation(1L));
+    }
+
+    @Test
+    @DisplayName("trafienie oddaje token chybienia")
+    void shouldReturnMissTokenOnHit() {
+        rateLimiter.checkCooperationInvitation(1L);
+        rateLimiter.refundCooperationInvitationMiss(1L);
+        rateLimiter.checkCooperationInvitation(1L);
+        rateLimiter.refundCooperationInvitationMiss(1L);
+
+        assertDoesNotThrow(() -> rateLimiter.checkCooperationInvitation(1L));
+    }
+
+    @Test
+    @DisplayName("równoległe chybienia nie przeskoczą limitu - token jest rezerwowany przed pytaniem o konto")
+    void shouldHoldMissLimitUnderConcurrency() throws Exception {
+        int watki = 10;
+        ExecutorService pula = Executors.newFixedThreadPool(watki);
+        CountDownLatch start = new CountDownLatch(1);
+        AtomicInteger przepuszczone = new AtomicInteger();
+
+        List<Future<?>> zadania = new ArrayList<>();
+        for (int i = 0; i < watki; i++) {
+            zadania.add(pula.submit(() -> {
+                start.await();
+                try {
+                    rateLimiter.checkCooperationInvitation(1L);
+                    przepuszczone.incrementAndGet();
+                } catch (RateLimitExceededException ignored) {
+
+                }
+                return null;
+            }));
+        }
+
+        start.countDown();
+        for (Future<?> zadanie : zadania) {
+            zadanie.get(5, TimeUnit.SECONDS);
+        }
+        pula.shutdown();
+
+        assertEquals(2, przepuszczone.get());
     }
 }

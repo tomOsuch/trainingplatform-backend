@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import pl.tomaszosuch.trainingplatform_backend.config.CooperationProperties;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.CooperationInviteRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.InvitationDecisionRequest;
@@ -19,6 +21,7 @@ import pl.tomaszosuch.trainingplatform_backend.exception.CooperationNotFoundExce
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.repository.CooperationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.RateLimiter;
 import pl.tomaszosuch.trainingplatform_backend.service.CooperationService;
 
 import org.springframework.security.access.AccessDeniedException;
@@ -46,14 +49,18 @@ public class CooperationServiceImpl implements CooperationService {
     private static final String NOT_PARTICIPANT_MESSAGE = "Nie jesteś stroną tej współpracy";
     private static final String NOT_ACTIVE_MESSAGE = "Ta współpraca nie jest aktywna";
     private static final String NOT_SENDER_MESSAGE = "To nie jest Twoje zaproszenie";
+    private static final String TOO_MANY_PENDING_MESSAGE = "Masz już %d oczekujących zaproszeń — wycofaj któreś albo poczekaj na odpowiedzi";
 
     private final CooperationRepository cooperationRepository;
     private final UserRepository userRepository;
     private final CooperationProperties properties;
     private final EmailService emailService;
+    private final RateLimiter rateLimiter;
 
     @Override
     public CooperationInvitationResponse invite(Long coachId, CooperationInviteRequest request) {
+
+        rateLimiter.checkCooperationInvitation(coachId);
 
         String email = request.email().trim();
 
@@ -61,14 +68,17 @@ public class CooperationServiceImpl implements CooperationService {
                 .filter(User::getIsActive)
                 .orElseThrow(() -> new UserNotFoundException(email));
 
+        rateLimiter.refundCooperationInvitationMiss(coachId);
+
         if (athlete.getId().equals(coachId)) {
             throw new IllegalArgumentException(SELF_INVITE_MESSAGE);
         }
 
-        requirePairIsFree(coachId, athlete.getId());
-
-        User coach = userRepository.findById(coachId)
+        User coach = userRepository.lockById(coachId)
                 .orElseThrow(() -> new UserNotFoundException(coachId));
+
+        requirePairIsFree(coachId, athlete.getId());
+        requireRoomForAnotherInvitation(coachId);
 
         Cooperation invitation = cooperationRepository.save(Cooperation.builder()
                 .coach(coach)
@@ -213,13 +223,19 @@ public class CooperationServiceImpl implements CooperationService {
         User initiator = endedByCoach ? cooperation.getCoach() : cooperation.getAthlete();
         User recipient = endedByCoach ? cooperation.getAthlete() : cooperation.getCoach();
 
-        try {
-            emailService.sendCooperationEnded(recipient.getEmail(), fullName(initiator));
+        Long id = cooperation.getId();
+        String recipientEmail = recipient.getEmail();
+        String initiatorName = fullName(initiator);
 
-        } catch (RuntimeException ex) {
-            log.error("Nie udało się powiadomić o zakończeniu współpracy (id={}): {}",
-                    cooperation.getId(), ex.getMessage(), ex);
-        }
+        afterCommit(() -> {
+            try {
+                emailService.sendCooperationEnded(recipientEmail, initiatorName);
+
+            } catch (RuntimeException ex) {
+                log.error("Nie udało się powiadomić o zakończeniu współpracy (id={}): {}",
+                        id, ex.getMessage(), ex);
+            }
+        });
     }
 
     private void requirePairIsFree(Long coachId, Long athleteId) {
@@ -243,6 +259,15 @@ public class CooperationServiceImpl implements CooperationService {
         expire(existing);
     }
 
+    private void requireRoomForAnotherInvitation(Long coachId) {
+        long pending = cooperationRepository.countByCoachIdAndStatusAndExpiresAtAfter(
+                coachId, CooperationStatus.PENDING, LocalDateTime.now());
+
+        if (pending >= properties.getMaxPendingInvitations()) {
+            throw new CooperationConflictException(TOO_MANY_PENDING_MESSAGE.formatted(pending));
+        }
+    }
+
     private void expire(Cooperation invitation) {
         invitation.setStatus(CooperationStatus.EXPIRED);
         cooperationRepository.saveAndFlush(invitation);
@@ -251,16 +276,33 @@ public class CooperationServiceImpl implements CooperationService {
     }
 
     private void deliver(Cooperation invitation) {
-        try {
-            emailService.sendCooperationInvitation(
-                    invitation.getAthlete().getEmail(),
-                    fullName(invitation.getCoach()),
-                    properties.getInvitationsUrl(),
-                    invitation.getExpiresAt());
+        Long id = invitation.getId();
+        String recipient = invitation.getAthlete().getEmail();
+        String coachName = fullName(invitation.getCoach());
+        String url = properties.getInvitationsUrl();
+        LocalDateTime expiresAt = invitation.getExpiresAt();
 
-        } catch (RuntimeException ex) {
-            log.error("Nie udało się wysłać zaproszenia do współpracy (id={}) na adres {}: {}",
-                    invitation.getId(), invitation.getAthlete().getEmail(), ex.getMessage(), ex);
+        afterCommit(() -> {
+            try {
+                emailService.sendCooperationInvitation(recipient, coachName, url, expiresAt);
+
+            } catch (RuntimeException ex) {
+                log.error("Nie udało się wysłać zaproszenia do współpracy (id={}) na adres {}: {}",
+                        id, recipient, ex.getMessage(), ex);
+            }
+        });
+    }
+
+    private static void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
         }
     }
 
