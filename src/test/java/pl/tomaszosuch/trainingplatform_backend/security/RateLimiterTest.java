@@ -36,6 +36,9 @@ public class RateLimiterTest {
         properties.setPasswordResetWindow(Duration.ofMinutes(60));
         properties.setInvitationPerAdmin(2);
         properties.setInvitationWindow(Duration.ofMinutes(60));
+        properties.setCooperationInvitationPerUser(3);
+        properties.setCooperationInvitationMissesPerUser(2);
+        properties.setCooperationInvitationWindow(Duration.ofMinutes(60));
 
         // Nowa instancja w każdym teście — kubełki żyją w polu, więc wspólny
         // obiekt przenosiłby zużycie między przypadkami i wyniki zależałyby
@@ -169,4 +172,40 @@ public class RateLimiterTest {
 
         assertDoesNotThrow(() -> rateLimiter.checkInvitationCreation(2L));
     }
+
+    @Test
+    @DisplayName("zaproszenia do współpracy są limitowane per użytkownik")
+    void shouldLimitCooperationInvitationsPerUser() {
+        rateLimiter.checkCooperationInvitation(1L);
+        rateLimiter.checkCooperationInvitation(1L);
+        rateLimiter.checkCooperationInvitation(1L);
+
+        assertThrows(RateLimitExceededException.class,
+                () -> rateLimiter.checkCooperationInvitation(1L));
+        assertDoesNotThrow(() -> rateLimiter.checkCooperationInvitation(2L));
+    }
+
+    @Test
+    @DisplayName("chybienia blokują wcześniej niż limit ogólny - to jest bariera przeciw enumeracji")
+    void shouldBlockAfterMissesEvenWithGeneralRoomLeft() {
+        rateLimiter.checkCooperationInvitation(1L);
+        rateLimiter.registerCooperationInvitationMiss(1L);
+        rateLimiter.registerCooperationInvitationMiss(1L);
+
+        // Kubełek ogólny ma jeszcze 2 z 3 tokenów, ale chybień już nie ma.
+        assertThrows(RateLimitExceededException.class,
+                () -> rateLimiter.checkCooperationInvitation(1L));
+    }
+
+    @Test
+    @DisplayName("trafione zaproszenie nie zużywa kubełka chybień")
+    void shouldNotConsumeMissesOnHit() {
+        rateLimiter.checkCooperationInvitation(1L);
+        rateLimiter.checkCooperationInvitation(1L);
+        rateLimiter.registerCooperationInvitationMiss(1L);
+
+        // Dwa trafienia i jedno chybienie - próg chybień to 2, więc przechodzi.
+        assertDoesNotThrow(() -> rateLimiter.checkCooperationInvitation(1L));
+    }
+
 }

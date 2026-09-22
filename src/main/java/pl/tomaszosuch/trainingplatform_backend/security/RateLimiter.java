@@ -15,8 +15,6 @@ import pl.tomaszosuch.trainingplatform_backend.exception.RateLimitExceededExcept
 import java.time.Duration;
 import java.util.Locale;
 
-import static org.hibernate.boot.cfgxml.spi.MappingReference.consume;
-
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -73,6 +71,29 @@ public class RateLimiter {
                 properties.getInvitationPerAdmin(), properties.getInvitationWindow());
     }
 
+    public void checkCooperationInvitation(Long userId) {
+        if (!properties.isEnabled()) {
+            return;
+        }
+
+        assertAvailable(integrationKey("chybienia", userId),
+                properties.getCooperationInvitationMissesPerUser(),
+                properties.getCooperationInvitationWindow());
+        consume(integrationKey("wszystkie", userId),
+                properties.getCooperationInvitationPerUser(),
+                properties.getCooperationInvitationWindow());
+    }
+
+    public void registerCooperationInvitationMiss(Long userId) {
+        if (!properties.isEnabled()) {
+            return;
+        }
+
+        penalize(integrationKey("chybienia", userId),
+                properties.getCooperationInvitationMissesPerUser(),
+                properties.getCooperationInvitationWindow());
+    }
+
     private void consume(String klucz, int limit, Duration okno) {
         ConsumptionProbe probe = kubelek(klucz, limit, okno).tryConsumeAndReturnRemaining(1);
 
@@ -91,6 +112,10 @@ public class RateLimiter {
             log.warn("Klucz {} jest wyczerpany — ponowna próba za {} s", klucz, sekundy);
             throw new RateLimitExceededException(sekundy);
         }
+    }
+
+    private String integrationKey(String type, Long userId) {
+        return "wspolpraca:" + type + ":uzytkownik:" + userId;
     }
 
     private void penalize(String klucz, int limit, Duration okno) {

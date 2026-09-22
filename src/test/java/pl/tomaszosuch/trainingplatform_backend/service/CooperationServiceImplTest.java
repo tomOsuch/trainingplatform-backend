@@ -1,6 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.service;
 
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,11 +34,11 @@ import pl.tomaszosuch.trainingplatform_backend.enums.InvitationDecision;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationConflictException;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationNotFoundException;
+import pl.tomaszosuch.trainingplatform_backend.exception.RateLimitExceededException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
-import pl.tomaszosuch.trainingplatform_backend.mapper.CooperationMapper;
-import pl.tomaszosuch.trainingplatform_backend.mapper.CooperationMapperImpl;
 import pl.tomaszosuch.trainingplatform_backend.repository.CooperationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.RateLimiter;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.CooperationServiceImpl;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,6 +58,9 @@ class CooperationServiceImplTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private RateLimiter rateLimiter;
+
     private CooperationServiceImpl service;
 
     private User coach;
@@ -71,10 +74,12 @@ class CooperationServiceImplTest {
         CooperationProperties properties = new CooperationProperties();
         properties.setInvitationExpirationDays(14);
         properties.setInvitationsUrl("http://localhost:3000/wspolpraca/zaproszenia");
+        // Konieczne, nie kosmetyczne: bez tego pole ma wartość 0, warunek 0 >= 0 jest
+        // prawdziwy i każde zaproszenie w tym pliku padłoby na limicie oczekujących.
+        properties.setMaxPendingInvitations(20);
 
-        CooperationMapper mapper = new CooperationMapperImpl();
         service = new CooperationServiceImpl(cooperationRepository, userRepository,
-                properties, emailService);
+                properties, emailService, rateLimiter);
     }
 
     private static User user(Long id, String email) {
@@ -431,4 +436,72 @@ class CooperationServiceImplTest {
         verify(cooperationRepository).lockById(10L);
         verify(cooperationRepository, never()).findById(anyLong());
     }
+
+    // --- I8: limity zaproszeń ---
+
+    @Test
+    @DisplayName("adres bez konta: 404 i kara w kubełku chybień")
+    void shouldRegisterMissForUnknownEmail() {
+        when(userRepository.findByEmail("nikt@example.com")).thenReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class,
+                () -> service.invite(COACH_ID, new CooperationInviteRequest("nikt@example.com")));
+
+        verify(rateLimiter).registerCooperationInvitationMiss(COACH_ID);
+        verify(cooperationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("konto wyłączone liczy się jak brak konta - nie wolno ich rozróżnić")
+    void shouldTreatInactiveAccountAsMiss() {
+        athlete.setIsActive(false);
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+
+        assertThrows(UserNotFoundException.class,
+                () -> service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL)));
+
+        verify(rateLimiter).registerCooperationInvitationMiss(COACH_ID);
+    }
+
+    @Test
+    @DisplayName("trafione zaproszenie nie karze kubełka chybień")
+    void shouldNotRegisterMissOnHit() {
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.findById(COACH_ID)).thenReturn(Optional.of(coach));
+        givenPairIsFree();
+        when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL));
+
+        verify(rateLimiter, never()).registerCooperationInvitationMiss(any());
+    }
+
+    @Test
+    @DisplayName("przekroczony limit zatrzymuje żądanie przed pierwszym zapytaniem do bazy")
+    void shouldStopBeforeLookupWhenLimited() {
+        doThrow(new RateLimitExceededException(60))
+                .when(rateLimiter).checkCooperationInvitation(COACH_ID);
+
+        assertThrows(RateLimitExceededException.class,
+                () -> service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL)));
+
+        verify(userRepository, never()).findByEmail(any());
+    }
+
+    @Test
+    @DisplayName("pełna pula oczekujących: 409, bez zapisu i bez maila")
+    void shouldRejectWhenPendingLimitReached() {
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        givenPairIsFree();
+        when(cooperationRepository.countByCoachIdAndStatusAndExpiresAtAfter(
+                eq(COACH_ID), eq(CooperationStatus.PENDING), any())).thenReturn(20L);
+
+        CooperationConflictException ex = assertThrows(CooperationConflictException.class,
+                () -> service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL)));
+
+        assertTrue(ex.getMessage().contains("20"));
+        verify(cooperationRepository, never()).save(any());
+        verify(emailService, never()).sendCooperationInvitation(any(), any(), any(), any());
+    }
+
 }

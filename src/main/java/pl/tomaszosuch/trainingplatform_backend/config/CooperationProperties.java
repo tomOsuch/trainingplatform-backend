@@ -18,4 +18,7 @@ public class CooperationProperties {
 
     @NotBlank
     private String invitationsUrl;
+
+    @Positive
+    private int maxPendingInvitations;
 }

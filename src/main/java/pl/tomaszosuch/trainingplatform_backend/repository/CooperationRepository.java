@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import pl.tomaszosuch.trainingplatform_backend.entity.Cooperation;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +22,8 @@ public interface CooperationRepository extends JpaRepository<Cooperation, Long> 
                                              @Param("status") CooperationStatus status);
 
     boolean existsByCoachIdAndAthleteIdAndStatus(Long coachId, Long athleteId, CooperationStatus status);
+
+    long countByCoachIdAndStatusAndExpiresAtAfter(Long coachId, CooperationStatus status, LocalDateTime now);
 
     Optional<Cooperation> findByCoachIdAndAthleteIdAndStatusIn(Long coachId, Long athleteId, Collection<CooperationStatus> statuses);
 

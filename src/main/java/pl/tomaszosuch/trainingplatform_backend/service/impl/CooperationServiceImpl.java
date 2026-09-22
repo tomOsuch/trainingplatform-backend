@@ -19,6 +19,7 @@ import pl.tomaszosuch.trainingplatform_backend.exception.CooperationNotFoundExce
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.repository.CooperationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
+import pl.tomaszosuch.trainingplatform_backend.security.RateLimiter;
 import pl.tomaszosuch.trainingplatform_backend.service.CooperationService;
 
 import org.springframework.security.access.AccessDeniedException;
@@ -46,26 +47,36 @@ public class CooperationServiceImpl implements CooperationService {
     private static final String NOT_PARTICIPANT_MESSAGE = "Nie jesteś stroną tej współpracy";
     private static final String NOT_ACTIVE_MESSAGE = "Ta współpraca nie jest aktywna";
     private static final String NOT_SENDER_MESSAGE = "To nie jest Twoje zaproszenie";
+    private static final String TOO_MANY_PENDING_MESSAGE = "Masz już %d oczekujących zaproszeń — wycofaj któreś albo poczekaj na odpowiedzi";
 
     private final CooperationRepository cooperationRepository;
     private final UserRepository userRepository;
     private final CooperationProperties properties;
     private final EmailService emailService;
+    private final RateLimiter rateLimiter;
 
     @Override
     public CooperationInvitationResponse invite(Long coachId, CooperationInviteRequest request) {
 
+        rateLimiter.checkCooperationInvitation(coachId);
+
         String email = request.email().trim();
 
-        User athlete = userRepository.findByEmail(email)
-                .filter(User::getIsActive)
-                .orElseThrow(() -> new UserNotFoundException(email));
+        Optional<User> found = userRepository.findByEmail(email).filter(User::getIsActive);
+
+        if (found.isEmpty()) {
+            rateLimiter.registerCooperationInvitationMiss(coachId);
+            throw new UserNotFoundException(email);
+        }
+
+        User athlete = found.get();
 
         if (athlete.getId().equals(coachId)) {
             throw new IllegalArgumentException(SELF_INVITE_MESSAGE);
         }
 
         requirePairIsFree(coachId, athlete.getId());
+        requireRoomForAnotherInvitation(coachId);
 
         User coach = userRepository.findById(coachId)
                 .orElseThrow(() -> new UserNotFoundException(coachId));
@@ -241,6 +252,15 @@ public class CooperationServiceImpl implements CooperationService {
         }
 
         expire(existing);
+    }
+
+    private void requireRoomForAnotherInvitation(Long coachId) {
+        long pending = cooperationRepository.countByCoachIdAndStatusAndExpiresAtAfter(
+                coachId, CooperationStatus.PENDING, LocalDateTime.now());
+
+        if (pending >= properties.getMaxPendingInvitations()) {
+            throw new CooperationConflictException(TOO_MANY_PENDING_MESSAGE.formatted(pending));
+        }
     }
 
     private void expire(Cooperation invitation) {

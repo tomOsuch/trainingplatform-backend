@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,6 +34,7 @@ import pl.tomaszosuch.trainingplatform_backend.enums.CooperationRole;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationConflictException;
+import pl.tomaszosuch.trainingplatform_backend.exception.RateLimitExceededException;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
 import pl.tomaszosuch.trainingplatform_backend.service.CooperationService;
 
@@ -187,4 +189,21 @@ class CooperationInvitationControllerTest {
                 .andExpect(jsonPath("$.message")
                         .value("To zaproszenie zostało już rozstrzygnięte"));
     }
+
+    // Przypina kontrakt dla frontu: 429 i Retry-After to informacja, którą
+    // formularz zaproszenia musi umieć pokazać.
+    @Test
+    @DisplayName("przekroczony limit: 429 z nagłówkiem Retry-After")
+    void shouldReturn429WithRetryAfter() throws Exception {
+        when(cooperationService.invite(anyLong(), any()))
+                .thenThrow(new RateLimitExceededException(120));
+
+        mockMvc.perform(post("/cooperation-invitations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"podopieczny@example.com\"}")
+                        .with(user(currentUser)).with(csrf()))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "120"));
+    }
+
 }

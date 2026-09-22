@@ -26,6 +26,7 @@ app:
   cooperation:
     invitation-expiration-days: 14
     invitations-url: http://localhost:3000/wspolpraca/zaproszenia
+    max-pending-invitations: 20
   password-reset:
     expiration-minutes: 60
     reset-base-url: http://localhost:3000/reset-password
@@ -45,6 +46,9 @@ app:
     password-reset-window: 60m
     invitation-per-admin: 20
     invitation-window: 60m
+    cooperation-invitation-per-user: 20
+    cooperation-invitation-misses-per-user: 5
+    cooperation-invitation-window: 60m
   reminders:
     enabled: false
     cron: "0 0 * * * *"
