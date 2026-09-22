@@ -159,7 +159,7 @@ class CooperationRepositoryTest {
         assertEquals(1, cooperationRepository
                 .findByCoachIdAndStatus(coach.getId(), CooperationStatus.ACTIVE).size());
         assertEquals(1, cooperationRepository
-                .findByAthleteIdAndStatus(athlete.getId(), CooperationStatus.ACTIVE).size());
+                .findByParticipantAndStatus(athlete.getId(), CooperationStatus.ACTIVE).size());
 
         assertTrue(cooperationRepository
                 .findByCoachIdAndStatus(athlete.getId(), CooperationStatus.ACTIVE).isEmpty());
@@ -190,10 +190,29 @@ class CooperationRepositoryTest {
         cooperation(coach, athlete, CooperationStatus.EXPIRED);
         em.flush();
 
-        // EXPIRED jest poza indeksem uq_cooperation_open_pair, więc nowe zaproszenie przechodzi.
         jdbcTemplate.update(INSERT_PENDING, coach.getId(), athlete.getId());
 
         assertEquals(2, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM cooperation WHERE coach_id = ?", Integer.class, coach.getId()));
+    }
+
+    @Test
+    @DisplayName("wycofane zaproszenie zwalnia parę - trener może zaprosić tę osobę ponownie")
+    void shouldFreePairAfterWithdrawal() {
+        Cooperation withdrawn = cooperation(coach, athlete, CooperationStatus.PENDING);
+        withdrawn.setStatus(CooperationStatus.WITHDRAWN);
+        em.flush();
+
+        jdbcTemplate.update(INSERT_PENDING, coach.getId(), athlete.getId());
+
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cooperation WHERE status = 'PENDING'", Integer.class));
+    }
+
+    @Test
+    @DisplayName("baza odrzuca stan spoza zestawu w kodzie")
+    void shouldRejectUnknownStatus() {
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbcTemplate.update(INSERT, coach.getId(), athlete.getId(), "CANCELLED"));
     }
 }

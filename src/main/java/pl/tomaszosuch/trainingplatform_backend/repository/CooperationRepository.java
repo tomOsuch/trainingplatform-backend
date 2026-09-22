@@ -18,10 +18,6 @@ public interface CooperationRepository extends JpaRepository<Cooperation, Long> 
     List<Cooperation> findByCoachIdAndStatus(@Param("coachId") Long coachId,
                                              @Param("status") CooperationStatus status);
 
-    @Query("SELECT c FROM Cooperation c JOIN FETCH c.coach WHERE c.athlete.id = :athleteId AND c.status = :status")
-    List<Cooperation> findByAthleteIdAndStatus(@Param("athleteId") Long athleteId,
-                                               @Param("status") CooperationStatus status);
-
     boolean existsByCoachIdAndAthleteIdAndStatus(Long coachId, Long athleteId, CooperationStatus status);
 
     Optional<Cooperation> findByCoachIdAndAthleteIdAndStatusIn(Long coachId, Long athleteId, Collection<CooperationStatus> statuses);
@@ -33,7 +29,7 @@ public interface CooperationRepository extends JpaRepository<Cooperation, Long> 
             JOIN FETCH c.athlete
             WHERE (c.coach.id = :userId OR c.athlete.id = :userId)
               AND c.status = :status
-            ORDER BY c.respondedAt DESC
+            ORDER BY COALESCE(c.respondedAt, c.createdAt) DESC
             """)
     List<Cooperation> findByParticipantAndStatus(@Param("userId") Long userId,
                                                  @Param("status") CooperationStatus status);

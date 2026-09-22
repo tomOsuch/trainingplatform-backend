@@ -1,5 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.service;
 
+import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -10,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,7 @@ import org.springframework.security.access.AccessDeniedException;
 import pl.tomaszosuch.trainingplatform_backend.config.CooperationProperties;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.CooperationInviteRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.InvitationDecisionRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.response.CooperationInvitationResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.CooperationResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.Cooperation;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
@@ -70,7 +73,7 @@ class CooperationServiceImplTest {
         properties.setInvitationsUrl("http://localhost:3000/wspolpraca/zaproszenia");
 
         CooperationMapper mapper = new CooperationMapperImpl();
-        service = new CooperationServiceImpl(cooperationRepository, userRepository, mapper,
+        service = new CooperationServiceImpl(cooperationRepository, userRepository,
                 properties, emailService);
     }
 
@@ -189,7 +192,7 @@ class CooperationServiceImplTest {
         service.respond(ATHLETE_ID, 10L, new InvitationDecisionRequest(InvitationDecision.ACCEPTED));
 
         assertEquals(CooperationStatus.ACTIVE, pending.getStatus());
-        assertTrue(pending.getRespondedAt() != null);
+        Assertions.assertNotNull(pending.getRespondedAt());
     }
 
     @Test
@@ -241,14 +244,14 @@ class CooperationServiceImplTest {
     }
 
     @Test
-    @DisplayName("lista otrzymanych pomija przeterminowane")
-    void shouldHideExpiredFromReceivedList() {
-        when(cooperationRepository.findByAthleteIdAndStatus(ATHLETE_ID, CooperationStatus.PENDING))
+    @DisplayName("lista oczekujących pomija przeterminowane")
+    void shouldHideExpiredFromPendingList() {
+        when(cooperationRepository.findByParticipantAndStatus(ATHLETE_ID, CooperationStatus.PENDING))
                 .thenReturn(List.of(
                         invitation(CooperationStatus.PENDING, LocalDateTime.now().plusDays(7)),
                         invitation(CooperationStatus.PENDING, LocalDateTime.now().minusDays(1))));
 
-        assertEquals(1, service.receivedInvitations(ATHLETE_ID).size());
+        assertEquals(1, service.pendingInvitations(ATHLETE_ID).size());
     }
 
     @Test
@@ -292,7 +295,7 @@ class CooperationServiceImplTest {
         service.end(COACH_ID, 10L);
 
         assertEquals(CooperationStatus.ENDED, active.getStatus());
-        assertTrue(active.getEndedAt() != null);
+        Assertions.assertNotNull(active.getEndedAt());
         verify(emailService).sendCooperationEnded(eq(ATHLETE_EMAIL), any());
     }
 
@@ -305,7 +308,6 @@ class CooperationServiceImplTest {
         service.end(ATHLETE_ID, 10L);
 
         assertEquals(CooperationStatus.ENDED, active.getStatus());
-        // Powiadomienie leci do trenera, czyli do drugiej strony niż przy poprzednim teście.
         verify(emailService).sendCooperationEnded(eq("trener@example.com"), any());
     }
 
@@ -338,7 +340,7 @@ class CooperationServiceImplTest {
         when(cooperationRepository.findByParticipantAndStatus(COACH_ID, CooperationStatus.ACTIVE))
                 .thenReturn(List.of(invitation(CooperationStatus.ACTIVE, null)));
 
-        CooperationResponse response = service.activeCooperations(COACH_ID).get(0);
+        CooperationResponse response = service.activeCooperations(COACH_ID).getFirst();
 
         assertEquals(CooperationRole.COACH, response.role());
         assertEquals(ATHLETE_ID, response.partnerId());
@@ -350,9 +352,71 @@ class CooperationServiceImplTest {
         when(cooperationRepository.findByParticipantAndStatus(ATHLETE_ID, CooperationStatus.ACTIVE))
                 .thenReturn(List.of(invitation(CooperationStatus.ACTIVE, null)));
 
-        CooperationResponse response = service.activeCooperations(ATHLETE_ID).get(0);
+        CooperationResponse response = service.activeCooperations(ATHLETE_ID).getFirst();
 
         assertEquals(CooperationRole.ATHLETE, response.role());
         assertEquals(COACH_ID, response.partnerId());
+    }
+
+    @Test
+    @DisplayName("trener wycofuje własne zaproszenie")
+    void shouldWithdrawOwnInvitation() {
+        Cooperation pending = invitation(CooperationStatus.PENDING, LocalDateTime.now().plusDays(7));
+        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(pending));
+
+        service.withdraw(COACH_ID, 10L);
+
+        assertEquals(CooperationStatus.WITHDRAWN, pending.getStatus());
+        assertNotNull(pending.getEndedAt());
+        verify(cooperationRepository).save(pending);
+    }
+
+    @Test
+    @DisplayName("adresat nie wycofa cudzego zaproszenia - ma własną drogę przez odmowę")
+    void shouldRejectWithdrawByAddressee() {
+        when(cooperationRepository.findById(10L))
+                .thenReturn(Optional.of(invitation(CooperationStatus.PENDING, LocalDateTime.now().plusDays(7))));
+
+        assertThrows(AccessDeniedException.class, () -> service.withdraw(ATHLETE_ID, 10L));
+
+        verify(cooperationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("zaproszenie już rozstrzygnięte: 409")
+    void shouldRejectWithdrawOfResolvedInvitation() {
+        when(cooperationRepository.findById(10L))
+                .thenReturn(Optional.of(invitation(CooperationStatus.ACTIVE, null)));
+
+        assertThrows(CooperationConflictException.class, () -> service.withdraw(COACH_ID, 10L));
+
+        verify(cooperationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("przeterminowane zaproszenie da się wycofać - inaczej zostałoby nie do ruszenia")
+    void shouldAllowWithdrawOfExpiredInvitation() {
+        Cooperation stale = invitation(CooperationStatus.PENDING, LocalDateTime.now().minusDays(1));
+        when(cooperationRepository.findById(10L)).thenReturn(Optional.of(stale));
+
+        service.withdraw(COACH_ID, 10L);
+
+        assertEquals(CooperationStatus.WITHDRAWN, stale.getStatus());
+    }
+
+    @Test
+    @DisplayName("to samo zaproszenie ma inną rolę i innego partnera zależnie od pytającego")
+    void shouldFlipRoleAndPartnerByCaller() {
+        Cooperation pending = invitation(CooperationStatus.PENDING, LocalDateTime.now().plusDays(7));
+        when(cooperationRepository.findByParticipantAndStatus(any(), eq(CooperationStatus.PENDING)))
+                .thenReturn(List.of(pending));
+
+        CooperationInvitationResponse forCoach = service.pendingInvitations(COACH_ID).getFirst();
+        CooperationInvitationResponse forAthlete = service.pendingInvitations(ATHLETE_ID).getFirst();
+
+        assertEquals(CooperationRole.COACH, forCoach.role());
+        assertEquals(ATHLETE_ID, forCoach.partnerId());
+        assertEquals(CooperationRole.ATHLETE, forAthlete.role());
+        assertEquals(COACH_ID, forAthlete.partnerId());
     }
 }
