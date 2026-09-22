@@ -11,11 +11,13 @@ public interface CooperationService {
 
     CooperationInvitationResponse invite(Long coachId, CooperationInviteRequest request);
 
-    List<CooperationInvitationResponse> receivedInvitations(Long athleteId);
+    List<CooperationInvitationResponse> pendingInvitations(Long userId);
 
     CooperationInvitationResponse respond(Long athleteId, Long invitationId, InvitationDecisionRequest request);
 
     List<CooperationResponse> activeCooperations(Long userId);
 
     void end(Long userId, Long cooperationId);
+
+    void withdraw(Long coachId, Long invitationId);
 }

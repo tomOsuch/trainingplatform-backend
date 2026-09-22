@@ -2,14 +2,10 @@ package pl.tomaszosuch.trainingplatform_backend.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -29,9 +25,11 @@ import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.access.AccessDeniedException;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.response.CooperationInvitationResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
+import pl.tomaszosuch.trainingplatform_backend.enums.CooperationRole;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationConflictException;
@@ -65,15 +63,17 @@ class CooperationInvitationControllerTest {
                 .build();
     }
 
-    private static CooperationInvitationResponse response(CooperationStatus status) {
-        return new CooperationInvitationResponse(10L, 1L, "Jan", "Kowalski", "trener@example.com",
-                status, LocalDateTime.now(), LocalDateTime.now().plusDays(14));
+    private static CooperationInvitationResponse response(CooperationStatus status, CooperationRole role) {
+        return new CooperationInvitationResponse(10L, role, 2L, "Anna", "Nowak",
+                "podopieczna@example.com", status, LocalDateTime.now(),
+                LocalDateTime.now().plusDays(14));
     }
 
     @Test
     @DisplayName("POST zwraca 201 z utworzonym zaproszeniem")
     void shouldReturn201OnInvite() throws Exception {
-        when(cooperationService.invite(anyLong(), any())).thenReturn(response(CooperationStatus.PENDING));
+        when(cooperationService.invite(anyLong(), any()))
+                .thenReturn(response(CooperationStatus.PENDING, CooperationRole.COACH));
 
         mockMvc.perform(post("/cooperation-invitations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -81,7 +81,7 @@ class CooperationInvitationControllerTest {
                         .with(user(currentUser)).with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.coachEmail").value("trener@example.com"))
+                .andExpect(jsonPath("$.partnerEmail").value("podopieczna@example.com"))
                 .andExpect(jsonPath("$.expiresAt").exists());
     }
 
@@ -113,15 +113,18 @@ class CooperationInvitationControllerTest {
     }
 
     @Test
-    @DisplayName("GET zwraca otrzymane zaproszenia")
-    void shouldReturnReceivedInvitations() throws Exception {
-        when(cooperationService.receivedInvitations(1L))
-                .thenReturn(List.of(response(CooperationStatus.PENDING)));
+    @DisplayName("GET zwraca zaproszenia obu kierunków, rozróżnione polem role")
+    void shouldReturnPendingInvitationsBothWays() throws Exception {
+        when(cooperationService.pendingInvitations(1L)).thenReturn(List.of(
+                response(CooperationStatus.PENDING, CooperationRole.COACH),
+                response(CooperationStatus.PENDING, CooperationRole.ATHLETE)));
 
         mockMvc.perform(get("/cooperation-invitations").with(user(currentUser)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].coachFirstName").value("Jan"));
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].role").value("COACH"))
+                .andExpect(jsonPath("$[1].role").value("ATHLETE"))
+                .andExpect(jsonPath("$[0].partnerFirstName").value("Anna"));
     }
 
     @Test
@@ -140,7 +143,7 @@ class CooperationInvitationControllerTest {
     @DisplayName("PATCH zwraca współpracę po akceptacji")
     void shouldReturnActiveAfterAccept() throws Exception {
         when(cooperationService.respond(anyLong(), anyLong(), any()))
-                .thenReturn(response(CooperationStatus.ACTIVE));
+                .thenReturn(response(CooperationStatus.ACTIVE, CooperationRole.ATHLETE));
 
         mockMvc.perform(patch("/cooperation-invitations/10")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -148,5 +151,40 @@ class CooperationInvitationControllerTest {
                         .with(user(currentUser)).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    @DisplayName("DELETE wycofuje zaproszenie i zwraca 204")
+    void shouldReturn204OnWithdraw() throws Exception {
+        mockMvc.perform(delete("/cooperation-invitations/10")
+                        .with(user(currentUser)).with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(cooperationService).withdraw(1L, 10L);
+    }
+
+    @Test
+    @DisplayName("wycofanie cudzego zaproszenia: 403")
+    void shouldReturn403WhenNotSender() throws Exception {
+        doThrow(new AccessDeniedException("To nie jest Twoje zaproszenie"))
+                .when(cooperationService).withdraw(anyLong(), anyLong());
+
+        mockMvc.perform(delete("/cooperation-invitations/10")
+                        .with(user(currentUser)).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Brak uprawnień"));
+    }
+
+    @Test
+    @DisplayName("wycofanie rozstrzygniętego zaproszenia: 409 z komunikatem z serwisu")
+    void shouldReturn409WhenAlreadyResolved() throws Exception {
+        doThrow(new CooperationConflictException("To zaproszenie zostało już rozstrzygnięte"))
+                .when(cooperationService).withdraw(anyLong(), anyLong());
+
+        mockMvc.perform(delete("/cooperation-invitations/10")
+                        .with(user(currentUser)).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("To zaproszenie zostało już rozstrzygnięte"));
     }
 }

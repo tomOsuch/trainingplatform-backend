@@ -17,7 +17,6 @@ import pl.tomaszosuch.trainingplatform_backend.enums.InvitationDecision;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationConflictException;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
-import pl.tomaszosuch.trainingplatform_backend.mapper.CooperationMapper;
 import pl.tomaszosuch.trainingplatform_backend.repository.CooperationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.service.CooperationService;
@@ -46,10 +45,10 @@ public class CooperationServiceImpl implements CooperationService {
     private static final String NOT_ADDRESSEE_MESSAGE = "To zaproszenie nie jest skierowane do Ciebie";
     private static final String NOT_PARTICIPANT_MESSAGE = "Nie jesteś stroną tej współpracy";
     private static final String NOT_ACTIVE_MESSAGE = "Ta współpraca nie jest aktywna";
+    private static final String NOT_SENDER_MESSAGE = "To nie jest Twoje zaproszenie";
 
     private final CooperationRepository cooperationRepository;
     private final UserRepository userRepository;
-    private final CooperationMapper cooperationMapper;
     private final CooperationProperties properties;
     private final EmailService emailService;
 
@@ -83,21 +82,23 @@ public class CooperationServiceImpl implements CooperationService {
 
         deliver(invitation);
 
-        return cooperationMapper.toResponse(invitation);
+        return toInvitationResponse(invitation, coachId);
     }
 
     @Override
-    public List<CooperationInvitationResponse> receivedInvitations(Long athleteId) {
-        return cooperationRepository.findByAthleteIdAndStatus(athleteId, CooperationStatus.PENDING).stream()
+    @Transactional(readOnly = true)
+    public List<CooperationInvitationResponse> pendingInvitations(Long userId) {
+        return cooperationRepository
+                .findByParticipantAndStatus(userId, CooperationStatus.PENDING).stream()
                 .filter(invitation -> !hasExpired(invitation))
-                .map(cooperationMapper::toResponse)
+                .map(invitation -> toInvitationResponse(invitation, userId))
                 .toList();
     }
 
     @Override
     public CooperationInvitationResponse respond(Long athleteId, Long invitationId, InvitationDecisionRequest request) {
 
-        Cooperation invitation = cooperationRepository.findById(invitationId)
+        Cooperation invitation = cooperationRepository.lockById(invitationId)
                 .orElseThrow(() -> new CooperationNotFoundException(invitationId));
 
         if (!invitation.getAthlete().getId().equals(athleteId)) {
@@ -120,7 +121,23 @@ public class CooperationServiceImpl implements CooperationService {
         log.info("Użytkownik {} odpowiedział na zaproszenie id={}: {}",
                 athleteId, invitationId, invitation.getStatus());
 
-        return cooperationMapper.toResponse(cooperationRepository.save(invitation));
+        return toInvitationResponse(cooperationRepository.save(invitation), athleteId);
+    }
+
+    private static CooperationInvitationResponse toInvitationResponse(Cooperation invitation, Long userId) {
+        boolean askingAsCoach = invitation.getCoach().getId().equals(userId);
+        User partner = askingAsCoach ? invitation.getAthlete() : invitation.getCoach();
+
+        return new CooperationInvitationResponse(
+                invitation.getId(),
+                askingAsCoach ? CooperationRole.COACH : CooperationRole.ATHLETE,
+                partner.getId(),
+                partner.getFirstName(),
+                partner.getLastName(),
+                partner.getEmail(),
+                invitation.getStatus(),
+                invitation.getCreatedAt(),
+                invitation.getExpiresAt());
     }
 
     @Override
@@ -134,7 +151,7 @@ public class CooperationServiceImpl implements CooperationService {
 
     @Override
     public void end(Long userId, Long cooperationId) {
-        Cooperation cooperation = cooperationRepository.findById(cooperationId)
+        Cooperation cooperation = cooperationRepository.lockById(cooperationId)
                 .orElseThrow(() -> new CooperationNotFoundException(cooperationId));
 
         boolean isCoach = cooperation.getCoach().getId().equals(userId);
@@ -155,6 +172,27 @@ public class CooperationServiceImpl implements CooperationService {
         log.info("Użytkownik {} zakończył współpracę id={}", userId, cooperationId);
 
         notifyOtherParty(cooperation, isCoach);
+    }
+
+    @Override
+    public void withdraw(Long coachId, Long invitationId) {
+
+        Cooperation invitation = cooperationRepository.lockById(invitationId)
+                .orElseThrow(() -> new CooperationNotFoundException(invitationId));
+
+        if (!invitation.getCoach().getId().equals(coachId)) {
+            throw new AccessDeniedException(NOT_SENDER_MESSAGE);
+        }
+
+        if (invitation.getStatus() != CooperationStatus.PENDING) {
+            throw new CooperationConflictException(ALREADY_RESOLVED_MESSAGE);
+        }
+
+        invitation.setStatus(CooperationStatus.WITHDRAWN);
+        invitation.setEndedAt(LocalDateTime.now());
+        cooperationRepository.save(invitation);
+
+        log.info("Użytkownik {} wycofał zaproszenie id={}", coachId, invitationId);
     }
 
     private static CooperationResponse toResponse(Cooperation cooperation, Long userId) {

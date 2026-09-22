@@ -30,9 +30,9 @@ public class CooperationInvitationController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CooperationInvitationResponse>> received(
+    public ResponseEntity<List<CooperationInvitationResponse>> pending(
             @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(cooperationService.receivedInvitations(currentUser.getId()));
+        return ResponseEntity.ok(cooperationService.pendingInvitations(currentUser.getId()));
     }
 
     @PatchMapping("/{id}")
@@ -41,5 +41,13 @@ public class CooperationInvitationController {
             @PathVariable Long id,
             @Valid @RequestBody InvitationDecisionRequest request) {
         return ResponseEntity.ok(cooperationService.respond(currentUser.getId(), id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> withdraw(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable Long id) {
+        cooperationService.withdraw(currentUser.getId(), id);
+        return ResponseEntity.noContent().build();
     }
 }
