@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import pl.tomaszosuch.trainingplatform_backend.config.CooperationProperties;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.CooperationInviteRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.InvitationDecisionRequest;
@@ -221,13 +223,19 @@ public class CooperationServiceImpl implements CooperationService {
         User initiator = endedByCoach ? cooperation.getCoach() : cooperation.getAthlete();
         User recipient = endedByCoach ? cooperation.getAthlete() : cooperation.getCoach();
 
-        try {
-            emailService.sendCooperationEnded(recipient.getEmail(), fullName(initiator));
+        Long id = cooperation.getId();
+        String recipientEmail = recipient.getEmail();
+        String initiatorName = fullName(initiator);
 
-        } catch (RuntimeException ex) {
-            log.error("Nie udało się powiadomić o zakończeniu współpracy (id={}): {}",
-                    cooperation.getId(), ex.getMessage(), ex);
-        }
+        afterCommit(() -> {
+            try {
+                emailService.sendCooperationEnded(recipientEmail, initiatorName);
+
+            } catch (RuntimeException ex) {
+                log.error("Nie udało się powiadomić o zakończeniu współpracy (id={}): {}",
+                        id, ex.getMessage(), ex);
+            }
+        });
     }
 
     private void requirePairIsFree(Long coachId, Long athleteId) {
@@ -268,16 +276,33 @@ public class CooperationServiceImpl implements CooperationService {
     }
 
     private void deliver(Cooperation invitation) {
-        try {
-            emailService.sendCooperationInvitation(
-                    invitation.getAthlete().getEmail(),
-                    fullName(invitation.getCoach()),
-                    properties.getInvitationsUrl(),
-                    invitation.getExpiresAt());
+        Long id = invitation.getId();
+        String recipient = invitation.getAthlete().getEmail();
+        String coachName = fullName(invitation.getCoach());
+        String url = properties.getInvitationsUrl();
+        LocalDateTime expiresAt = invitation.getExpiresAt();
 
-        } catch (RuntimeException ex) {
-            log.error("Nie udało się wysłać zaproszenia do współpracy (id={}) na adres {}: {}",
-                    invitation.getId(), invitation.getAthlete().getEmail(), ex.getMessage(), ex);
+        afterCommit(() -> {
+            try {
+                emailService.sendCooperationInvitation(recipient, coachName, url, expiresAt);
+
+            } catch (RuntimeException ex) {
+                log.error("Nie udało się wysłać zaproszenia do współpracy (id={}) na adres {}: {}",
+                        id, recipient, ex.getMessage(), ex);
+            }
+        });
+    }
+
+    private static void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
         }
     }
 

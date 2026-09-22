@@ -1,9 +1,6 @@
 package pl.tomaszosuch.trainingplatform_backend.service;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -21,6 +18,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 import pl.tomaszosuch.trainingplatform_backend.config.CooperationProperties;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.CooperationInviteRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.request.InvitationDecisionRequest;
@@ -500,6 +499,70 @@ class CooperationServiceImplTest {
         assertTrue(ex.getMessage().contains("20"));
         verify(cooperationRepository, never()).save(any());
         verify(emailService, never()).sendCooperationInvitation(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("w transakcji mail z zaproszeniem czeka na commit - nie wychodzi pod blokadą")
+    void shouldSendInvitationOnlyAfterCommit() {
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
+        givenPairIsFree();
+        when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL));
+
+            verify(emailService, never()).sendCooperationInvitation(any(), any(), any(), any());
+
+            TransactionSynchronizationUtils.triggerAfterCommit();
+
+            verify(emailService).sendCooperationInvitation(
+                    eq(ATHLETE_EMAIL), eq("Jan Testowy"),
+                    eq("http://localhost:3000/wspolpraca/zaproszenia"), any());
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("powiadomienie o zakończeniu też czeka na commit")
+    void shouldNotifyEndOnlyAfterCommit() {
+        Cooperation active = invitation(CooperationStatus.ACTIVE, null);
+        when(cooperationRepository.lockById(10L)).thenReturn(Optional.of(active));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.end(COACH_ID, 10L);
+
+            verify(emailService, never()).sendCooperationEnded(any(), any());
+
+            TransactionSynchronizationUtils.triggerAfterCommit();
+
+            verify(emailService).sendCooperationEnded(eq(ATHLETE_EMAIL), eq("Jan Testowy"));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("awaria poczty po commicie nie zamienia zapisanego zaproszenia w błąd")
+    void shouldSwallowMailFailureAfterCommit() {
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
+        givenPairIsFree();
+        when(cooperationRepository.save(any(Cooperation.class))).thenAnswer(inv -> inv.getArgument(0));
+        doThrow(new RuntimeException("Dostawca niedostępny"))
+                .when(emailService).sendCooperationInvitation(any(), any(), any(), any());
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL));
+
+            assertDoesNotThrow(TransactionSynchronizationUtils::triggerAfterCommit);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
 }
