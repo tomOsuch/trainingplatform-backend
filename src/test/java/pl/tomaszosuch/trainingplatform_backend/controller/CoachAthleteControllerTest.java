@@ -279,6 +279,7 @@ class CoachAthleteControllerTest {
                         .with(user(currentUser)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.createdByCoach").value(true))
                 .andExpect(jsonPath("$.createdByName").value("Jan Kowalski"))
                 .andExpect(jsonPath("$.createdById").value(1));
