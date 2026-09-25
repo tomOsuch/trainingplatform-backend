@@ -19,7 +19,8 @@ public record TrainingPlanResponse(
         String notes,
         PlanStatus status,
         boolean createdByCoach,
-        String createdByName
+        String createdByName,
+        Long createdById
 ) {
 
 }

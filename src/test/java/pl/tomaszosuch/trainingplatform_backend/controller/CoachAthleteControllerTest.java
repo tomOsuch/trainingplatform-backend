@@ -252,11 +252,26 @@ class CoachAthleteControllerTest {
     }
 
     @Test
+    @DisplayName("edycja planu po zakończeniu współpracy: 403 z komunikatem, na którym front opiera wyjście z trybu")
+    void shouldReturnGenericForbiddenWhenEditingWithoutCooperation() throws Exception {
+        when(coachAthleteService.updateTrainingPlan(anyLong(), anyLong(), anyLong(), any()))
+                .thenThrow(new AccessDeniedException(GUARD_MESSAGE));
+
+        mockMvc.perform(put("/coach/athletes/2/training-plans/10")
+                        .with(user(currentUser)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(RESPONSE_MESSAGE));
+    }
+
+    @Test
     @DisplayName("utworzony plan wraca z 201 i oznaczeniem autorstwa")
     void shouldReturn201WithAuthorship() throws Exception {
         TrainingPlanResponse created = new TrainingPlanResponse(
                 10L, "Interwały", 5L, "Taniec", "#9B59B6", "music",
-                LocalDate.now().plusDays(2), null, 45, null, PlanStatus.PLANNED, true, "Jan Kowalski");
+                LocalDate.now().plusDays(2), null, 45, null, PlanStatus.PLANNED,
+                true, "Jan Kowalski", 1L);
 
         when(coachAthleteService.createTrainingPlan(eq(1L), eq(ATHLETE_ID), any())).thenReturn(created);
 
@@ -266,7 +281,8 @@ class CoachAthleteControllerTest {
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.createdByCoach").value(true))
-                .andExpect(jsonPath("$.createdByName").value("Jan Kowalski"));
+                .andExpect(jsonPath("$.createdByName").value("Jan Kowalski"))
+                .andExpect(jsonPath("$.createdById").value(1));
 
         verify(coachAthleteService).createTrainingPlan(1L, ATHLETE_ID, validRequest);
     }

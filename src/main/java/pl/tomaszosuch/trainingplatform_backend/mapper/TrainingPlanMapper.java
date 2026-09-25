@@ -17,6 +17,7 @@ public interface TrainingPlanMapper {
     @Mapping(target = "categoryIconName", source = "category.iconName")
     @Mapping(target = "createdByCoach", expression = "java(trainingPlan.getCreatedBy() != null)")
     @Mapping(target = "createdByName", expression = "java(authorName(trainingPlan.getCreatedBy()))")
+    @Mapping(target = "createdById", source = "createdBy.id")
     TrainingPlanResponse toResponse(TrainingPlan trainingPlan);
 
     default String authorName(User author) {
