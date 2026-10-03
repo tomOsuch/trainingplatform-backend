@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -93,7 +94,7 @@ public class AuthControllerTest {
     void setUp() {
         validRegister = new RegisterRequest("Jan", "Kowalski", "jan.kowalski@example.com", "password", "token-zaproszenia");
         validLogin = new LoginRequest("jan.kowalski@example.com", "password");
-        userResponse = new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER);
+        userResponse = new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER, false);
         loginResponse = new LoginResponse("token", 1L, "jan.kowalski@example.com", Role.USER);
         loginResult = new AuthService.LoginResult(
                 loginResponse,
@@ -438,6 +439,26 @@ public class AuthControllerTest {
                 .andExpect(header().string("Retry-After", "42"))
                 .andExpect(jsonPath("$.status").value(429))
                 .andExpect(jsonPath("$.message").value("Zbyt wiele prób. Spróbuj ponownie za chwilę."));
+    }
+
+    @Test
+    @DisplayName("rejestracja bez pola coach przechodzi, a pole dociera do serwisu jako null")
+    void shouldAcceptRegistrationWithoutCoachField() throws Exception {
+        when(authService.register(any(RegisterRequest.class))).thenReturn(userResponse);
+
+        mockMvc.perform(post("/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Jan","lastName":"Kowalski",
+                                 "email":"jan.kowalski@example.com","password":"password",
+                                 "token":"token-zaproszenia"}
+                                """))
+                .andExpect(status().isCreated());
+
+        ArgumentCaptor<RegisterRequest> captor = ArgumentCaptor.forClass(RegisterRequest.class);
+        verify(authService).register(captor.capture());
+        org.junit.jupiter.api.Assertions.assertNull(captor.getValue().coach());
     }
 
 }

@@ -20,4 +20,6 @@ public interface ProfileService {
     NotificationPreferencesResponse getNotificationPreferences(Long userId);
 
     NotificationPreferencesResponse updateNotificationPreferences(Long userId, NotificationPreferencesRequest request);
+
+    UserResponse setCoachMode(Long userId, boolean enabled);
 }

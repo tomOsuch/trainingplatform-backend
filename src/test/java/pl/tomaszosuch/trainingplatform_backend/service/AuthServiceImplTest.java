@@ -141,7 +141,7 @@ public class AuthServiceImplTest {
             when(userRepository.save(any(User.class))).thenReturn(savedUser);
             when(userMapper.toResponse(any(User.class))).thenReturn(
                     new UserResponse(1L, "jan.kowalski@example.com", "Jan", "Kowalski",
-                            LocalDate.of(1990, 5, 14), Role.USER));
+                            LocalDate.of(1990, 5, 14), Role.USER, false));
 
             UserResponse response = authService.register(validRequest);
 
@@ -305,6 +305,52 @@ public class AuthServiceImplTest {
             assertNull(invitation.getUsedAt());
             verify(invitationRepository, never()).save(any(Invitation.class));
         }
+
+        @Test
+        @DisplayName("deklaracja trybu trenera przy rejestracji trafia na konto")
+        void shouldRegisterAsCoachWhenDeclared() {
+            RegisterRequest asCoach = new RegisterRequest(
+                    "Jan", "Kowalski", "jan.kowalski@example.com", "password", TOKEN, true);
+
+            stubValidInvitation();
+            when(userRepository.existsByEmail(anyString())).thenReturn(false);
+            when(passwordEncoder.encode(anyString())).thenReturn("hash");
+            when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+            authService.register(asCoach);
+
+            verify(userRepository).save(argThat(User::isCoach));
+        }
+
+        @Test
+        @DisplayName("bez deklaracji konto jest zwykłe")
+        void shouldRegisterAsRegularUserByDefault() {
+            stubValidInvitation();
+            when(userRepository.existsByEmail(anyString())).thenReturn(false);
+            when(passwordEncoder.encode(anyString())).thenReturn("hash");
+            when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+            authService.register(validRequest);
+
+            verify(userRepository).save(argThat(user -> !user.isCoach()));
+        }
+
+        @Test
+        @DisplayName("null w polu coach - czyli żądanie bez tego pola - daje zwykłe konto")
+        void shouldRegisterAsRegularUserWhenCoachIsNull() {
+            RegisterRequest withoutCoach = new RegisterRequest(
+                    "Jan", "Kowalski", "jan.kowalski@example.com", "password", TOKEN, null);
+
+            stubValidInvitation();
+            when(userRepository.existsByEmail(anyString())).thenReturn(false);
+            when(passwordEncoder.encode(anyString())).thenReturn("hash");
+            when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+            authService.register(withoutCoach);
+
+            verify(userRepository).save(argThat(user -> !user.isCoach()));
+        }
+
     }
 
     @Nested

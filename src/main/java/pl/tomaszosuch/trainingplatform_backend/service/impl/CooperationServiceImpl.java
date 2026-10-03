@@ -16,6 +16,7 @@ import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationRole;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.InvitationDecision;
+import pl.tomaszosuch.trainingplatform_backend.exception.CoachModeRequiredException;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationConflictException;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
@@ -60,6 +61,10 @@ public class CooperationServiceImpl implements CooperationService {
     @Override
     public CooperationInvitationResponse invite(Long coachId, CooperationInviteRequest request) {
 
+        if (!userRepository.existsByIdAndCoachTrue(coachId)) {
+            throw new CoachModeRequiredException();
+        }
+        
         rateLimiter.checkCooperationInvitation(coachId);
 
         String email = request.email().trim();
@@ -76,6 +81,10 @@ public class CooperationServiceImpl implements CooperationService {
 
         User coach = userRepository.lockById(coachId)
                 .orElseThrow(() -> new UserNotFoundException(coachId));
+
+        if (!coach.isCoach()) {
+            throw new CoachModeRequiredException();
+        }
 
         requirePairIsFree(coachId, athlete.getId());
         requireRoomForAnotherInvitation(coachId);

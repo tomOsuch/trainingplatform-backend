@@ -17,10 +17,13 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.NotificationPreferencesResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
+import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
+import pl.tomaszosuch.trainingplatform_backend.exception.CooperationConflictException;
 import pl.tomaszosuch.trainingplatform_backend.exception.LastAdminException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
+import pl.tomaszosuch.trainingplatform_backend.repository.CooperationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.security.LastAdminGuard;
@@ -60,11 +63,15 @@ public class ProfileServiceImplTest {
     @Mock
     private RefreshTokenService refreshTokenService;
 
+    @Mock
+    private CooperationRepository cooperationRepository;
+
     private User existingUser;
 
     @BeforeEach
     void setUp() {
-        profileService = new ProfileServiceImpl(userRepository, passwordEncoder, userMapper,
+        profileService = new ProfileServiceImpl(
+                cooperationRepository, userRepository, passwordEncoder, userMapper,
                 invitationRepository, refreshTokenService, new LastAdminGuard(userRepository));
 
         existingUser = User.builder()
@@ -84,7 +91,7 @@ public class ProfileServiceImplTest {
         // given
         when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(existingUser));
         when(userMapper.toResponse(any(User.class)))
-                .thenReturn(new UserResponse(1L, "jan@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER));
+                .thenReturn(new UserResponse(1L, "jan@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER, false));
 
         // when
         UserResponse response = profileService.getProfile(1L);
@@ -115,7 +122,7 @@ public class ProfileServiceImplTest {
         when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(existingUser));
         when(userRepository.save(existingUser)).thenReturn(existingUser);
         when(userMapper.toResponse(any(User.class)))
-                .thenReturn(new UserResponse(1L, "jan@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER));
+                .thenReturn(new UserResponse(1L, "jan@example.com", "Jan", "Kowalski", LocalDate.of(1990, 5, 14), Role.USER, false));
 
         // when
         UserResponse updatedProfile = profileService.updateProfile(1L, updateRequest);
@@ -412,5 +419,71 @@ public class ProfileServiceImplTest {
         assertThrows(UserNotFoundException.class, () -> profileService.getNotificationPreferences(99L));
         assertThrows(UserNotFoundException.class,
                 () -> profileService.updateNotificationPreferences(99L, new NotificationPreferencesRequest(true, 24)));
+    }
+
+    @Test
+    @DisplayName("włączenie trybu trenera zapisuje flagę")
+    void shouldEnableCoachMode() {
+        when(userRepository.lockById(1L)).thenReturn(Optional.of(existingUser));
+        when(userRepository.save(existingUser)).thenReturn(existingUser);
+
+        profileService.setCoachMode(1L, true);
+
+        assertTrue(existingUser.isCoach());
+        verify(cooperationRepository, never()).withdrawPendingByCoach(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("wyłączenie wycofuje oczekujące zaproszenia")
+    void shouldWithdrawPendingWhenDisabling() {
+        existingUser.setCoach(true);
+        when(userRepository.lockById(1L)).thenReturn(Optional.of(existingUser));
+        when(cooperationRepository.countByCoachIdAndStatus(1L, CooperationStatus.ACTIVE)).thenReturn(0L);
+        when(userRepository.save(existingUser)).thenReturn(existingUser);
+
+        profileService.setCoachMode(1L, false);
+
+        assertFalse(existingUser.isCoach());
+        verify(cooperationRepository).withdrawPendingByCoach(eq(1L), any());
+    }
+
+    @Test
+    @DisplayName("aktywni podopieczni blokują wyłączenie: 409, nic się nie zmienia")
+    void shouldRefuseToDisableWithActiveAthletes() {
+        existingUser.setCoach(true);
+        when(userRepository.lockById(1L)).thenReturn(Optional.of(existingUser));
+        when(cooperationRepository.countByCoachIdAndStatus(1L, CooperationStatus.ACTIVE)).thenReturn(2L);
+
+        CooperationConflictException ex = assertThrows(CooperationConflictException.class,
+                () -> profileService.setCoachMode(1L, false));
+
+        assertTrue(ex.getMessage().contains("(2)"));
+        assertTrue(existingUser.isCoach());
+        verify(cooperationRepository, never()).withdrawPendingByCoach(anyLong(), any());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("ten sam stan drugi raz niczego nie zapisuje")
+    void shouldDoNothingWhenStateUnchanged() {
+        existingUser.setCoach(true);
+        when(userRepository.lockById(1L)).thenReturn(Optional.of(existingUser));
+
+        profileService.setCoachMode(1L, true);
+
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(cooperationRepository);
+    }
+
+    @Test
+    @DisplayName("PUT /profile nie rusza flagi - dlatego tryb trenera ma osobny endpoint")
+    void shouldNotTouchCoachFlagOnProfileUpdate() {
+        existingUser.setCoach(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(existingUser));
+        when(userRepository.save(existingUser)).thenReturn(existingUser);
+
+        profileService.updateProfile(1L, new UpdateProfileRequest("Janusz", "Nowak", null));
+
+        assertTrue(existingUser.isCoach());
     }
 }

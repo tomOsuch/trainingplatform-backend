@@ -13,8 +13,11 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.NotificationPreferencesResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
+import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
+import pl.tomaszosuch.trainingplatform_backend.exception.CooperationConflictException;
 import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
 import pl.tomaszosuch.trainingplatform_backend.mapper.UserMapper;
+import pl.tomaszosuch.trainingplatform_backend.repository.CooperationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.InvitationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.security.LastAdminGuard;
@@ -29,6 +32,10 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class ProfileServiceImpl implements ProfileService {
 
+    private static final String ACTIVE_ATHLETES_MESSAGE =
+            "Masz aktywnych podopiecznych (%d) — zakończ współpracę, zanim wyłączysz tryb trenera";
+
+    private final CooperationRepository cooperationRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
@@ -128,6 +135,31 @@ public class ProfileServiceImpl implements ProfileService {
                 user.getEmail(), request.remindersEnabled(), request.reminderHoursBefore());
 
         return userMapper.toNotificationPreferences(userRepository.save(user));
+    }
+
+    @Override
+    public UserResponse setCoachMode(Long userId, boolean enabled) {
+        User user = userRepository.lockById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        if (user.isCoach() == enabled) {
+            return userMapper.toResponse(user);
+        }
+
+        if (!enabled) {
+            long active = cooperationRepository.countByCoachIdAndStatus(userId, CooperationStatus.ACTIVE);
+            if (active > 0) {
+                throw new CooperationConflictException(ACTIVE_ATHLETES_MESSAGE.formatted(active));
+            }
+
+            int withdrawn = cooperationRepository.withdrawPendingByCoach(userId, LocalDateTime.now());
+            log.info("Konto {} wyłącza tryb trenera — wycofano {} oczekujących zaproszeń",
+                    user.getEmail(), withdrawn);
+        }
+
+        user.setCoach(enabled);
+
+        return userMapper.toResponse(userRepository.save(user));
     }
 
 }

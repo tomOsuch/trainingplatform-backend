@@ -10,7 +10,8 @@ public record UserResponse(
         String firstName,
         String lastName,
         LocalDate birthDate,
-        Role role
+        Role role,
+        boolean coach
 ) {
 
 }

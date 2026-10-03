@@ -33,6 +33,7 @@ import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationRole;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
+import pl.tomaszosuch.trainingplatform_backend.exception.CoachModeRequiredException;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationConflictException;
 import pl.tomaszosuch.trainingplatform_backend.exception.RateLimitExceededException;
 import pl.tomaszosuch.trainingplatform_backend.security.JwtAuthenticationFilter;
@@ -204,6 +205,22 @@ class CooperationInvitationControllerTest {
                         .with(user(currentUser)).with(csrf()))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().string("Retry-After", "120"));
+    }
+
+    @Test
+    @DisplayName("konto bez trybu trenera: 403 z komunikatem i BEZ mapy errors")
+    void shouldReturn403WithoutErrorsMapWhenNotCoach() throws Exception {
+        when(cooperationService.invite(anyLong(), any()))
+                .thenThrow(new CoachModeRequiredException());
+
+        mockMvc.perform(post("/cooperation-invitations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"podopieczny@example.com\"}")
+                        .with(user(currentUser)).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(
+                        "Zapraszać podopiecznych może konto z włączonym trybem trenera — włączysz go w profilu"))
+                .andExpect(jsonPath("$.errors").doesNotExist());
     }
 
 }
