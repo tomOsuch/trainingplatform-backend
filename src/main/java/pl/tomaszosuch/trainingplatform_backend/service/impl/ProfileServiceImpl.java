@@ -12,6 +12,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.NotificationPreferenc
 import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.NotificationPreferencesResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
+import pl.tomaszosuch.trainingplatform_backend.entity.Cooperation;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.exception.CooperationConflictException;
@@ -25,6 +26,7 @@ import pl.tomaszosuch.trainingplatform_backend.service.ProfileService;
 import pl.tomaszosuch.trainingplatform_backend.service.RefreshTokenService;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -147,14 +149,24 @@ public class ProfileServiceImpl implements ProfileService {
         }
 
         if (!enabled) {
-            long active = cooperationRepository.countByCoachIdAndStatus(userId, CooperationStatus.ACTIVE);
+            List<Cooperation> open = cooperationRepository.lockOpenByCoachId(userId);
+
+            long active = open.stream()
+                    .filter(cooperation -> cooperation.getStatus() == CooperationStatus.ACTIVE)
+                    .count();
+
             if (active > 0) {
                 throw new CooperationConflictException(ACTIVE_ATHLETES_MESSAGE.formatted(active));
             }
 
-            int withdrawn = cooperationRepository.withdrawPendingByCoach(userId, LocalDateTime.now());
+            LocalDateTime now = LocalDateTime.now();
+            open.forEach(invitation -> {
+                invitation.setStatus(CooperationStatus.WITHDRAWN);
+                invitation.setEndedAt(now);
+            });
+
             log.info("Konto {} wyłącza tryb trenera — wycofano {} oczekujących zaproszeń",
-                    user.getEmail(), withdrawn);
+                    user.getEmail(), open.size());
         }
 
         user.setCoach(enabled);

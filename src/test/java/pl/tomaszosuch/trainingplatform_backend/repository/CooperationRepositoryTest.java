@@ -25,6 +25,7 @@ import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Testcontainers
 @DataJpaTest
@@ -215,4 +216,23 @@ class CooperationRepositoryTest {
         assertThrows(DataIntegrityViolationException.class,
                 () -> jdbcTemplate.update(INSERT, coach.getId(), athlete.getId(), "CANCELLED"));
     }
+
+    @Test
+    @DisplayName("blokada przy wyłączaniu trybu obejmuje tylko otwarte współprace tego trenera")
+    void shouldLockOnlyOpenCooperationsOfGivenCoach() {
+        Cooperation pending = cooperation(coach, athlete, CooperationStatus.PENDING);
+        Cooperation active = cooperation(coach, outsider, CooperationStatus.ACTIVE);
+        cooperation(outsider, coach, CooperationStatus.ACTIVE);
+        Cooperation ended = cooperation(coach, outsider, CooperationStatus.ENDED);
+        em.flush();
+
+        List<Long> ids = cooperationRepository.lockOpenByCoachId(coach.getId()).stream()
+                .map(Cooperation::getId)
+                .toList();
+
+        assertEquals(2, ids.size());
+        assertTrue(ids.containsAll(List.of(pending.getId(), active.getId())));
+        assertFalse(ids.contains(ended.getId()));
+    }
+
 }

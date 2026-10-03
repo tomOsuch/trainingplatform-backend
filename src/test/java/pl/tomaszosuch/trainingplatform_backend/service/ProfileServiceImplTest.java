@@ -16,6 +16,7 @@ import pl.tomaszosuch.trainingplatform_backend.dto.request.NotificationPreferenc
 import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.NotificationPreferencesResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
+import pl.tomaszosuch.trainingplatform_backend.entity.Cooperation;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
@@ -430,36 +431,43 @@ public class ProfileServiceImplTest {
         profileService.setCoachMode(1L, true);
 
         assertTrue(existingUser.isCoach());
-        verify(cooperationRepository, never()).withdrawPendingByCoach(anyLong(), any());
+        verifyNoInteractions(cooperationRepository);
     }
 
     @Test
     @DisplayName("wyłączenie wycofuje oczekujące zaproszenia")
     void shouldWithdrawPendingWhenDisabling() {
         existingUser.setCoach(true);
+        Cooperation pending = Cooperation.builder()
+                .id(10L).status(CooperationStatus.PENDING).build();
         when(userRepository.lockById(1L)).thenReturn(Optional.of(existingUser));
-        when(cooperationRepository.countByCoachIdAndStatus(1L, CooperationStatus.ACTIVE)).thenReturn(0L);
+        when(cooperationRepository.lockOpenByCoachId(1L)).thenReturn(List.of(pending));
         when(userRepository.save(existingUser)).thenReturn(existingUser);
 
         profileService.setCoachMode(1L, false);
 
         assertFalse(existingUser.isCoach());
-        verify(cooperationRepository).withdrawPendingByCoach(eq(1L), any());
+        assertEquals(CooperationStatus.WITHDRAWN, pending.getStatus());
+        assertNotNull(pending.getEndedAt());
     }
 
     @Test
     @DisplayName("aktywni podopieczni blokują wyłączenie: 409, nic się nie zmienia")
     void shouldRefuseToDisableWithActiveAthletes() {
         existingUser.setCoach(true);
+        Cooperation active = Cooperation.builder()
+                .id(10L).status(CooperationStatus.ACTIVE).build();
+        Cooperation pending = Cooperation.builder()
+                .id(11L).status(CooperationStatus.PENDING).build();
         when(userRepository.lockById(1L)).thenReturn(Optional.of(existingUser));
-        when(cooperationRepository.countByCoachIdAndStatus(1L, CooperationStatus.ACTIVE)).thenReturn(2L);
+        when(cooperationRepository.lockOpenByCoachId(1L)).thenReturn(List.of(active, pending));
 
         CooperationConflictException ex = assertThrows(CooperationConflictException.class,
                 () -> profileService.setCoachMode(1L, false));
 
-        assertTrue(ex.getMessage().contains("(2)"));
+        assertTrue(ex.getMessage().contains("(1)"));
         assertTrue(existingUser.isCoach());
-        verify(cooperationRepository, never()).withdrawPendingByCoach(anyLong(), any());
+        assertEquals(CooperationStatus.PENDING, pending.getStatus());
         verify(userRepository, never()).save(any());
     }
 

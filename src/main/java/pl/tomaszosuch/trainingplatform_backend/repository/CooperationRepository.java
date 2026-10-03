@@ -3,7 +3,6 @@ package pl.tomaszosuch.trainingplatform_backend.repository;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -26,8 +25,6 @@ public interface CooperationRepository extends JpaRepository<Cooperation, Long> 
 
     long countByCoachIdAndStatusAndExpiresAtAfter(Long coachId, CooperationStatus status, LocalDateTime now);
 
-    long countByCoachIdAndStatus(Long coachId, CooperationStatus status);
-
     Optional<Cooperation> findByCoachIdAndAthleteIdAndStatusIn(Long coachId, Long athleteId, Collection<CooperationStatus> statuses);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -45,13 +42,12 @@ public interface CooperationRepository extends JpaRepository<Cooperation, Long> 
     List<Cooperation> findByParticipantAndStatus(@Param("userId") Long userId,
                                                  @Param("status") CooperationStatus status);
 
-    @Modifying
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
-            UPDATE Cooperation c
-            SET c.status = pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus.WITHDRAWN,
-                c.endedAt = :now
+            SELECT c FROM Cooperation c
             WHERE c.coach.id = :coachId
-              AND c.status = pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus.PENDING
+              AND c.status IN (pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus.PENDING,
+                               pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus.ACTIVE)
             """)
-    int withdrawPendingByCoach(@Param("coachId") Long coachId, @Param("now") LocalDateTime now);
+    List<Cooperation> lockOpenByCoachId(@Param("coachId") Long coachId);
 }
