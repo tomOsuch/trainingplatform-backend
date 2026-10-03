@@ -31,10 +31,7 @@ import pl.tomaszosuch.trainingplatform_backend.enums.CooperationRole;
 import pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus;
 import pl.tomaszosuch.trainingplatform_backend.enums.InvitationDecision;
 import pl.tomaszosuch.trainingplatform_backend.enums.Role;
-import pl.tomaszosuch.trainingplatform_backend.exception.CooperationConflictException;
-import pl.tomaszosuch.trainingplatform_backend.exception.CooperationNotFoundException;
-import pl.tomaszosuch.trainingplatform_backend.exception.RateLimitExceededException;
-import pl.tomaszosuch.trainingplatform_backend.exception.UserNotFoundException;
+import pl.tomaszosuch.trainingplatform_backend.exception.*;
 import pl.tomaszosuch.trainingplatform_backend.repository.CooperationRepository;
 import pl.tomaszosuch.trainingplatform_backend.repository.UserRepository;
 import pl.tomaszosuch.trainingplatform_backend.security.RateLimiter;
@@ -69,6 +66,9 @@ class CooperationServiceImplTest {
     void setUp() {
         coach = user(COACH_ID, "trener@example.com");
         athlete = user(ATHLETE_ID, ATHLETE_EMAIL);
+
+        coach.setCoach(true);
+        lenient().when(userRepository.existsByIdAndCoachTrue(COACH_ID)).thenReturn(true);
 
         CooperationProperties properties = new CooperationProperties();
         properties.setInvitationExpirationDays(14);
@@ -563,6 +563,31 @@ class CooperationServiceImplTest {
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
+    }
+
+    @Test
+    @DisplayName("konto bez trybu trenera: 403 przed limitem i przed wyszukaniem konta")
+    void shouldRejectInviteWithoutCoachMode() {
+        when(userRepository.existsByIdAndCoachTrue(COACH_ID)).thenReturn(false);
+
+        assertThrows(CoachModeRequiredException.class,
+                () -> service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL)));
+
+        verify(rateLimiter, never()).checkCooperationInvitation(any());
+        verify(userRepository, never()).findByEmail(any());
+    }
+
+    @Test
+    @DisplayName("tryb wyłączony w międzyczasie: drugie sprawdzenie pod blokadą zatrzymuje zapis")
+    void shouldRejectWhenCoachModeDisabledMeanwhile() {
+        coach.setCoach(false);
+        when(userRepository.findByEmail(ATHLETE_EMAIL)).thenReturn(Optional.of(athlete));
+        when(userRepository.lockById(COACH_ID)).thenReturn(Optional.of(coach));
+
+        assertThrows(CoachModeRequiredException.class,
+                () -> service.invite(COACH_ID, new CooperationInviteRequest(ATHLETE_EMAIL)));
+
+        verify(cooperationRepository, never()).save(any());
     }
 
 }

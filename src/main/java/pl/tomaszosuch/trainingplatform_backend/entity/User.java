@@ -59,6 +59,8 @@ public class User implements UserDetails {
     @Column(name = "reminder_hours_before", nullable = false)
     @Builder.Default
     private Integer reminderHoursBefore = 24;
+    @Column(nullable = false)
+    private boolean coach;
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     @Column(name = "updated_at")

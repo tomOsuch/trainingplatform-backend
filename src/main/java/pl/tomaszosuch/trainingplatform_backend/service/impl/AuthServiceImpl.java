@@ -69,6 +69,7 @@ public class AuthServiceImpl implements AuthService {
                 .lastName(request.lastName())
                 .role(invitation.getRole())
                 .isActive(true)
+                .coach(Boolean.TRUE.equals(request.coach()))
                 .build();
 
         User saved = userRepository.save(user);

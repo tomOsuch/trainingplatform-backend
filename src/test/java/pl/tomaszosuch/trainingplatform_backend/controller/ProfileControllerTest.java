@@ -67,7 +67,8 @@ public class ProfileControllerTest {
                 "Jan",
                 "Kowalski",
                 LocalDate.of(1990, 5, 14),
-                Role.USER);
+                Role.USER,
+                false);
     }
 
     @Test
@@ -386,5 +387,33 @@ public class ProfileControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.message").value("To ostatnie aktywne konto administratora — bez niego nikt nie odzyska dostępu do panelu"));
+    }
+
+
+    @Test
+    @DisplayName("PUT /profile/coach przełącza tryb i zwraca profil")
+    void shouldSetCoachMode() throws Exception {
+        when(profileService.setCoachMode(1L, true)).thenReturn(userResponse);
+
+        mockMvc.perform(put("/profile/coach")
+                        .with(user(currentUser)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true}"))
+                .andExpect(status().isOk());
+
+        verify(profileService).setCoachMode(1L, true);
+    }
+
+    @Test
+    @DisplayName("puste żądanie to 400, a nie ciche wyłączenie trybu")
+    void shouldRejectMissingEnabled() throws Exception {
+        mockMvc.perform(put("/profile/coach")
+                        .with(user(currentUser)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.enabled").exists());
+
+        verify(profileService, never()).setCoachMode(anyLong(), anyBoolean());
     }
 }

@@ -41,4 +41,13 @@ public interface CooperationRepository extends JpaRepository<Cooperation, Long> 
             """)
     List<Cooperation> findByParticipantAndStatus(@Param("userId") Long userId,
                                                  @Param("status") CooperationStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT c FROM Cooperation c
+            WHERE c.coach.id = :coachId
+              AND c.status IN (pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus.PENDING,
+                               pl.tomaszosuch.trainingplatform_backend.enums.CooperationStatus.ACTIVE)
+            """)
+    List<Cooperation> lockOpenByCoachId(@Param("coachId") Long coachId);
 }

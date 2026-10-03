@@ -75,7 +75,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             SelfDeactivationException.class,
             LastAdminException.class,
-            PlanAuthorshipException.class
+            PlanAuthorshipException.class,
+            CoachModeRequiredException.class
     })
     public ResponseEntity<ErrorResponse> handleForbiddenWithReason(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)

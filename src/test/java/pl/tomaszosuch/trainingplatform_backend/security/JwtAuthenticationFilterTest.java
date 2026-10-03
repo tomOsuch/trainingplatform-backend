@@ -71,7 +71,7 @@ class JwtAuthenticationFilterTest {
     void shouldAuthenticateActiveAccount() throws Exception {
         when(userDetailsService.loadUserByUsername(EMAIL)).thenReturn(account(true));
         when(profileService.getProfile(USER_ID)).thenReturn(
-                new UserResponse(USER_ID, EMAIL, "Jan", "Kowalski", null, Role.USER));
+                new UserResponse(USER_ID, EMAIL, "Jan", "Kowalski", null, Role.USER, false));
 
         getProfileWithToken()
                 .andExpect(status().isOk())

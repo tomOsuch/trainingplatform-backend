@@ -4,10 +4,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import pl.tomaszosuch.trainingplatform_backend.dto.request.ChangePasswordRequest;
-import pl.tomaszosuch.trainingplatform_backend.dto.request.DeleteAccountRequest;
-import pl.tomaszosuch.trainingplatform_backend.dto.request.NotificationPreferencesRequest;
-import pl.tomaszosuch.trainingplatform_backend.dto.request.UpdateProfileRequest;
+import pl.tomaszosuch.trainingplatform_backend.dto.request.*;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.NotificationPreferencesResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.UserResponse;
 import pl.tomaszosuch.trainingplatform_backend.entity.User;
@@ -51,6 +48,14 @@ public class ProfileController {
             @Valid @RequestBody NotificationPreferencesRequest request) {
         return ResponseEntity.ok(
                 profileService.updateNotificationPreferences(currentUser.getId(), request));
+    }
+
+    @PutMapping("/coach")
+    public ResponseEntity<UserResponse> setCoachMode(
+            @AuthenticationPrincipal User currentUser,
+            @Valid @RequestBody CoachModeRequest request) {
+        return ResponseEntity.ok(
+                profileService.setCoachMode(currentUser.getId(), request.enabled()));
     }
 
     @PostMapping("/change-password")
