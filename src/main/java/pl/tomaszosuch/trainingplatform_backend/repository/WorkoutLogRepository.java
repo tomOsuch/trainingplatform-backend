@@ -15,8 +15,6 @@ import pl.tomaszosuch.trainingplatform_backend.entity.WorkoutLog;
 @Repository
 public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long>, JpaSpecificationExecutor<WorkoutLog> {
 
-    List<WorkoutLog> findByUserIdOrderByPerformedDateDesc(Long userId);
-
     boolean existsByCategoryId(Long categoryId);
 
     @Modifying(flushAutomatically = true)

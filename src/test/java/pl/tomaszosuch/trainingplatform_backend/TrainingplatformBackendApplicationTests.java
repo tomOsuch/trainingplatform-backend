@@ -2,18 +2,11 @@ package pl.tomaszosuch.trainingplatform_backend;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
+import pl.tomaszosuch.trainingplatform_backend.support.PostgresContainerSupport;
+
 @SpringBootTest
-class TrainingplatformBackendApplicationTests {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine");
+class TrainingplatformBackendApplicationTests extends PostgresContainerSupport {
 
     @Test
     void contextLoads() {
