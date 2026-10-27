@@ -11,12 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import pl.tomaszosuch.trainingplatform_backend.dto.response.AdminUserResponse;
 import pl.tomaszosuch.trainingplatform_backend.dto.response.PageResponse;
@@ -29,17 +25,13 @@ import pl.tomaszosuch.trainingplatform_backend.security.LastAdminGuard;
 import pl.tomaszosuch.trainingplatform_backend.service.AdminUserService;
 import pl.tomaszosuch.trainingplatform_backend.service.RefreshTokenService;
 import pl.tomaszosuch.trainingplatform_backend.service.impl.AdminUserServiceImpl;
+import pl.tomaszosuch.trainingplatform_backend.support.PostgresContainerSupport;
 
-@Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({AdminUserServiceImpl.class, UserMapperImpl.class, LastAdminGuard.class})
 @DisplayName("AdminUserQueryTest")
-class AdminUserQueryTest {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine");
+class AdminUserQueryTest extends PostgresContainerSupport {
 
     @Autowired
     private TestEntityManager em;
